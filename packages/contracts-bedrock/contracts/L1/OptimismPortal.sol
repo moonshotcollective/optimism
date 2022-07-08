@@ -22,25 +22,24 @@ contract OptimismPortal is Initializable, ResourceMetering {
     uint8 public constant VERSION = 1;
 
     /**
+     * @notice Version of the deposit event.
+     */
+    uint256 internal constant DEPOSIT_VERSION = 1;
+
+    /**
      * @notice Emitted when a transaction is deposited from L1 to L2. The parameters of this event
      *         are read by the rollup node and used to derive deposit transactions on L2.
      *
      * @param from       Address that triggered the deposit transaction.
      * @param to         Address that the deposit transaction is directed to.
-     * @param mint       Amount of ETH to mint to the sender on L2.
-     * @param value      Amount of ETH to send to the recipient.
-     * @param gasLimit   Minimum gas limit that the message can be executed with.
-     * @param isCreation Whether the message is a contract creation.
-     * @param data       Data to attach to the message and call the recipient with.
+     * @param version    Version of this deposit transaction event.
+     * @param opaqueData ABI encoded deposit data to be parsed off-chain.
      */
     event TransactionDeposited(
         address indexed from,
         address indexed to,
-        uint256 mint,
-        uint256 value,
-        uint64 gasLimit,
-        bool isCreation,
-        bytes data
+        uint256 version,
+        bytes opaqueData
     );
 
     /**
@@ -50,6 +49,7 @@ contract OptimismPortal is Initializable, ResourceMetering {
      * @param success        Whether the withdrawal transaction was successful.
      */
     event WithdrawalFinalized(bytes32 indexed withdrawalHash, bool success);
+
 
     /**
      * @notice Value used to reset the l2Sender, this is more efficient than setting it to zero.
@@ -159,9 +159,11 @@ contract OptimismPortal is Initializable, ResourceMetering {
             from = AddressAliasHelper.applyL1ToL2Alias(msg.sender);
         }
 
+        bytes memory opaqueData = abi.encode(msg.value, _value, _gasLimit, _isCreation, _data);
+
         // Emit a TransactionDeposited event so that the rollup node can derive a deposit
         // transaction for this deposit.
-        emit TransactionDeposited(from, _to, msg.value, _value, _gasLimit, _isCreation, _data);
+        emit TransactionDeposited(from, _to, DEPOSIT_VERSION, opaqueData);
     }
 
     /**
