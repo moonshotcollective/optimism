@@ -161,32 +161,40 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver {
     }
 
     /**
-     * @notice Determine if an L2 Output is finalized.
+     * @notice Determine if an L2 Output is finalized for a given block number.
      *
      * @param _l2BlockNumber The number of the L2 block.
      */
-
     function isOutputFinalized(uint256 _l2BlockNumber) external view returns (bool) {
-        L2OutputOracle.OutputProposal memory proposal = L2_ORACLE.getL2Output(_l2BlockNumber);
+        L2OutputOracle.OutputProposal memory proposal;
 
-        if (proposal.outputRoot == bytes32(uint256(0))) {
-            uint256 interval = L2_ORACLE.SUBMISSION_INTERVAL();
-            uint256 startingBlockNumber = L2_ORACLE.STARTING_BLOCK_NUMBER();
-
-            // Prevent underflow
-            if (startingBlockNumber > _l2BlockNumber) {
-                return false;
-            }
-
-            // Find the distance between the _l2BlockNumber, and the checkpoint block before it.
-            uint256 offset = (_l2BlockNumber - startingBlockNumber) % interval;
-            // Look up the checkpoint block after it.
-            proposal = L2_ORACLE.getL2Output(_l2BlockNumber + (interval - offset));
-            // False if that block is not yet appended.
-            if (proposal.outputRoot == bytes32(uint256(0))) {
-                return false;
-            }
+        // Determine the next block after _l2BlockNumber that will be proposed.
+        uint256 interval = L2_ORACLE.SUBMISSION_INTERVAL();
+        uint256 startingBlockNumber = L2_ORACLE.STARTING_BLOCK_NUMBER();
+        if (startingBlockNumber > _l2BlockNumber) {
+            return false;
         }
+
+        // Find the distance between _l2BlockNumber, and the checkpoint block before it.
+        uint256 offset = (_l2BlockNumber - startingBlockNumber) % interval;
+
+        // If the offset is zero, then the block is the checkpoint block.
+        // Otherwise, we'll look up the next checkpoint block.
+        uint256 lookupBlockNumber = offset == 0
+            ? _l2BlockNumber
+            : _l2BlockNumber + (interval - offset);
+
+        try L2_ORACLE.getL2Output(lookupBlockNumber) returns (
+            L2OutputOracle.OutputProposal memory _proposal
+        ) {
+            proposal = _proposal;
+        } catch Error(string memory _reason) {
+            _requireReason("OutputOracle: No output found for that block number.", _reason);
+
+            // False if no output has been proposed on top of _l2BlockNumber.
+            return false;
+        }
+
         return block.timestamp > proposal.timestamp + FINALIZATION_PERIOD_SECONDS;
     }
 
@@ -227,7 +235,8 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver {
             "OptimismPortal: you cannot send messages to the portal contract"
         );
 
-        // Get the output root.
+        // Get the output root. This will fail if there is no
+        // output root for the given block number.
         L2OutputOracle.OutputProposal memory proposal = L2_ORACLE.getL2Output(_l2BlockNumber);
 
         // Ensure that enough time has passed since the proposal was submitted before allowing a
@@ -334,5 +343,22 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver {
                 _proof,
                 _storageRoot
             );
+    }
+
+    /**
+     * @notice Compares the expected and actual revert reason strings. And bubbles the actual error
+     * if it doesn't match the expected error.
+     *
+     * @param _expectedReason The expected error reason.
+     * @param _actualReason   The actual error reason.
+     */
+    function _requireReason(string memory _expectedReason, string memory _actualReason)
+        internal
+        pure
+        returns (bool)
+    {
+        bytes32 _expectedHash = keccak256(abi.encode(_expectedReason));
+        bytes32 _actualHash = keccak256(abi.encode(_actualReason));
+        require(_actualHash == _expectedHash, _actualReason);
     }
 }
