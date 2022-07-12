@@ -159,7 +159,7 @@ contract OptimismPortal is Initializable, ResourceMetering {
             from = AddressAliasHelper.applyL1ToL2Alias(msg.sender);
         }
 
-        bytes memory opaqueData = abi.encode(msg.value, _value, _gasLimit, _isCreation, _data);
+        bytes memory opaqueData = abi.encodePacked(msg.value, _value, _gasLimit, _isCreation, _data);
 
         // Emit a TransactionDeposited event so that the rollup node can derive a deposit
         // transaction for this deposit.
