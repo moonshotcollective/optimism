@@ -269,7 +269,7 @@ contract OptimismPortal_Test is Portal_Initializer {
         );
 
         vm.expectRevert("OptimismPortal: invalid output root proof");
-        op.finalizeWithdrawalTransaction(0, alice, alice, 0, 0, hex"", 0, outputRootProof, hex"");
+        op.finalizeWithdrawalTransaction(0, alice, alice, 0, 0, hex"", startingBlockNumber, outputRootProof, hex"");
     }
 
     function test_simple_isOutputFinalized() external {

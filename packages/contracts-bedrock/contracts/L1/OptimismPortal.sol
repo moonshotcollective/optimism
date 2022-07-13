@@ -165,7 +165,7 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver {
      *
      * @param _l2BlockNumber The number of the L2 block.
      */
-    function isOutputFinalized(uint256 _l2BlockNumber) external view returns (bool) {
+    function isOutputFinalized(uint256 _l2BlockNumber) public view returns (bool) {
         L2OutputOracle.OutputProposal memory proposal;
 
         // Determine the next block after _l2BlockNumber that will be proposed.
@@ -207,7 +207,7 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver {
      * @param _value           ETH to send to the target.
      * @param _gasLimit        Minumum gas to be forwarded to the target.
      * @param _data            Data to send to the target.
-     * @param _l2BlockNumber   L2 block number of the outputRoot.
+     * @param _l2BlockNumber   L2 block number containing the withdrawal.
      * @param _outputRootProof Inclusion proof of the withdrawer contracts storage root.
      * @param _withdrawalProof Inclusion proof for the given withdrawal in the withdrawer contract.
      */
@@ -243,10 +243,7 @@ contract OptimismPortal is Initializable, ResourceMetering, Semver {
         // withdrawal. Under the assumption that the fault proof mechanism is operating correctly,
         // we can infer that any withdrawal that has passed the finalization period must be valid
         // and can therefore be operated on.
-        require(
-            block.timestamp > proposal.timestamp + FINALIZATION_PERIOD_SECONDS,
-            "OptimismPortal: proposal is not yet finalized"
-        );
+        require(isOutputFinalized(_l2BlockNumber), "OptimismPortal: proposal is not yet finalized");
 
         // Verify that the output root can be generated with the elements in the proof.
         require(
