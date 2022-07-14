@@ -2,8 +2,8 @@
 pragma solidity 0.8.10;
 
 // import "./../BadgeAdmin.sol";
-import { BadgeAdmin } from "../universal/citizen-house/BadgeAdmin.sol";
-import { Badge } from "../universal/citizen-house/Badge.sol";
+import { BadgeAdmin } from "../../universal/citizen-house/BadgeAdmin.sol";
+import { Badge } from "../../universal/citizen-house/Badge.sol";
 import { Test } from "forge-std/Test.sol";
 
 contract TBadge is Badge {
@@ -22,7 +22,7 @@ contract TBadgeAdmin is BadgeAdmin {
     constructor() BadgeAdmin(address(badge), 20, 20, 20, adrs) {}
 }
 
-contract BadgeAdminTest is DSTest {
+contract BadgeAdminTest is Test {
     TBadgeAdmin internal badgeAdmin;
     TBadge internal badge;
 
@@ -64,8 +64,6 @@ contract BadgeAdminTest is DSTest {
 
     uint256[] testFailSupply;
 
-    Vm internal constant hevm = Vm(HEVM_ADDRESS);
-
     function setUp() public {
         badgeAdmin = new TBadgeAdmin();
         badge = new TBadge();
@@ -99,38 +97,38 @@ contract BadgeAdminTest is DSTest {
     }
 
     function _setup() public {
-        hevm.prank(opAdr[0]);
+        vm.prank(opAdr[0]);
         badgeAdmin.addOPCOs(testAdrArr, testOpCoSupply);
-        hevm.prank(testOpCoAdr1);
+        vm.prank(testOpCoAdr1);
         badgeAdmin.addCitizens(testAdrArr);
 
-        hevm.prank(0xb4c79daB8f259C7Aee6E5b2Aa729821864227e84); // deployer address
+        vm.prank(0xb4c79daB8f259C7Aee6E5b2Aa729821864227e84); // deployer address
         badgeAdmin.updateBadgeContract(address(badge));
         badge.updateAdminContract(address(badgeAdmin));
     }
 
     function testInvalidAddOPs() public {
-        hevm.expectRevert("Error: Sender Not OP");
-        hevm.prank(testBadAdr);
+        vm.expectRevert("Error: Sender Not OP");
+        vm.prank(testBadAdr);
         badgeAdmin.addOPs(testAdrArr);
     }
 
     function testAddOPCOs() public {
-        hevm.prank(opAdr[0]);
+        vm.prank(opAdr[0]);
         badgeAdmin.addOPCOs(testAdrArr, testOpCoSupply);
     }
 
     function testInvalidAddOPCOs() public {
-        hevm.expectRevert("Error: Sender Not OP");
-        hevm.prank(0xffffff308539Da3d54F90676b52568515Ed43F39);
+        vm.expectRevert("Error: Sender Not OP");
+        vm.prank(0xffffff308539Da3d54F90676b52568515Ed43F39);
         badgeAdmin.addOPCOs(testAdrArr, testOpCoSupply);
     }
 
     function testInvalidOpCoAddCitizens() public {
-        hevm.prank(opAdr[0]);
+        vm.prank(opAdr[0]);
         badgeAdmin.addOPCOs(testAdrArr, testOpCoSupply);
-        hevm.prank(testBadAdr);
-        hevm.expectRevert("Error: Sender Not OPCO");
+        vm.prank(testBadAdr);
+        vm.expectRevert("Error: Sender Not OPCO");
         badgeAdmin.addCitizens(testAdrArr);
     }
 
@@ -143,18 +141,18 @@ contract BadgeAdminTest is DSTest {
     function testMint() public {
         _setup();
 
-        hevm.prank(testAdrArr[0]);
+        vm.prank(testAdrArr[0]);
         badgeAdmin.mint();
     }
 
     function testInvalidAdminMint() public {
         _setup();
 
-        hevm.prank(0xb4c79daB8f259C7Aee6E5b2Aa729821864227e84); // deployer address
+        vm.prank(0xb4c79daB8f259C7Aee6E5b2Aa729821864227e84); // deployer address
         badge.updateAdminContract(0xb4c79daB8f259C7Aee6E5b2Aa729821864227e84);
 
-        hevm.prank(testAdrArr[0]);
-        hevm.expectRevert("Error: Sender is not Admin");
+        vm.prank(testAdrArr[0]);
+        vm.expectRevert("Error: Sender is not Admin");
         badgeAdmin.mint();
     }
 }

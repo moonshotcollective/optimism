@@ -5,7 +5,7 @@ pragma solidity 0.8.15;
 import { Test } from "forge-std/Test.sol";
 import { SimpleStorage } from "../testing/helpers/SimpleStorage.sol";
 import { MockTeleportr } from "../testing/helpers/MockTeleportr.sol";
-import { TeleportrWithdrawer } from "../universal/TeleportrWithdrawer.sol";
+import { TeleportrWithdrawer } from "../L1/TeleportrWithdrawer.sol";
 
 contract TeleportrWithdrawer_Initializer is Test {
     address alice = address(128);
