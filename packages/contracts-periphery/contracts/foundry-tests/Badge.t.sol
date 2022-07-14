@@ -8,7 +8,7 @@ contract TBadge is Badge {
     constructor() Badge("example", "ex", "example.com") {}
 }
 
-contract BadgeTest is DSTest {
+contract BadgeTest is Test {
     TBadge internal badge;
 
     address testAdr1;

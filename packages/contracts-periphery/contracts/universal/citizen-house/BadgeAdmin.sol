@@ -284,7 +284,8 @@ contract BadgeAdmin is Ownable {
             Citizens[i] = Citizens[i + 1];
         }
         Citizens.pop(); // delete the last item
-        CitizenIndexMap[_adr] = 2**256 - 1; // set the index map to MAXINT
+        // set the index map to the max int value
+        CitizenIndexMap[_adr] = type(uint256).max;
         CitizenCount--;
     }
 

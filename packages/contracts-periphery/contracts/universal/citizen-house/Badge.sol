@@ -3,6 +3,7 @@ pragma solidity ^0.8.9;
 
 import { SafeTransferLib } from "@rari-capital/solmate/src/utils/SafeTransferLib.sol";
 import { ERC721 } from "@rari-capital/solmate/src/tokens/ERC721.sol";
+import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 error Soulbound(string _method);
@@ -99,12 +100,11 @@ contract Badge is ERC721, Ownable {
         revert Soulbound("setApprovalForAll(address, uint256)");
     }
 
-    // https://eips.ethereum.org/EIPS/eip-165#simple-summary
-    function supportsInterface(bytes4 _interfaceId) public pure override(ERC721) returns (bool) {
-        return
-            _interfaceId == 0x7f5828d0 || // ERC165 Interface ID for ERC173
-            _interfaceId == 0x80ac58cd || // ERC165 Interface ID for ERC721
-            _interfaceId == 0x5b5e139f || // ERC165 Interface ID for ERC165
-            _interfaceId == 0x01ffc9a7; // ERC165 Interface ID for ERC721Metadata
+    /// @notice ERC165 interface check function.
+    /// @param _interfaceId Interface ID to check.
+    /// @return Whether or not the interface is supported by this contract.
+    function supportsInterface(bytes4 _interfaceId) public view override returns (bool) {
+        bytes4 iface1 = type(IERC165).interfaceId;
+        return _interfaceId == iface1;
     }
 }
