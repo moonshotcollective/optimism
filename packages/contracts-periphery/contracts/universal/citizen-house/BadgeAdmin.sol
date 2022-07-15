@@ -20,6 +20,7 @@ contract BadgeAdmin is Ownable {
     event CitizenRemoved(address indexed _opco, address indexed _removed);
     event Minted(address indexed _minter, address indexed _opco);
     event Burned(address indexed _burner);
+    event MetadataChanged(string _role, address indexed _adr);
 
     /*///////////////////////////////////////////////////////////////
                               MODIFIERS
@@ -46,6 +47,7 @@ contract BadgeAdmin is Ownable {
 
     struct OP {
         address op;
+        string metadata;
     }
 
     struct OPCO {
@@ -53,14 +55,16 @@ contract BadgeAdmin is Ownable {
         address[] citizens;
         uint256 supply;
         uint256 minted;
+        string metadata;
     }
 
     struct Citizen {
         address citizen;
         address opco;
         bool minted;
-        address delegate;
+        address representative;
         uint256 delegations;
+        string metadata;
     }
 
     uint256 public CitizenCount;
@@ -105,7 +109,7 @@ contract BadgeAdmin is Ownable {
                               OP  LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function addOPs(address[] memory _adrs) external onlyOP {
+    function addOPs(address[] calldata _adrs) external onlyOP {
         require(_adrs.length <= maxOPLimit, "OP limit crossed");
         for (uint256 i = 0; i < _adrs.length; i++) {
             _newOP(_adrs[i]);
@@ -113,12 +117,18 @@ contract BadgeAdmin is Ownable {
         emit OPsAdded(msg.sender);
     }
 
-    function addOPCOs(address[] memory _adrs, uint256[] memory _supplies) external onlyOP {
+    function addOPCOs(address[] calldata _adrs, uint256[] memory _supplies) external onlyOP {
         require(_adrs.length <= maxOPCOLimit, "OPCO limit crossed");
         for (uint256 i = 0; i < _adrs.length; i++) {
             _newOPCO(_adrs[i], _supplies[i]);
         }
         emit OPCOsAdded(msg.sender, OPCOCount);
+    }
+
+    function updateOPMetadata(address _op, string memory _metadata) external onlyOP {
+        uint256 opIndex = OPIndexMap[_op];
+        OPs[opIndex].metadata = _metadata;
+        emit MetadataChanged("OP", _op);
     }
 
     // TODO: Remove OPCO & OP Methods
@@ -127,7 +137,7 @@ contract BadgeAdmin is Ownable {
                               OPCO  LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function addCitizens(address[] memory _adrs) external onlyOPCO {
+    function addCitizens(address[] calldata _adrs) external onlyOPCO {
         require(
             OPCOs[OPCOIndexMap[msg.sender]].citizens.length + _adrs.length <=
                 OPCOs[OPCOIndexMap[msg.sender]].supply,
@@ -149,6 +159,11 @@ contract BadgeAdmin is Ownable {
         emit CitizenRemoved(msg.sender, _adr);
     }
 
+    function updateOPCOMetadata(string calldata _metadata) external onlyOPCO {
+        OPCOs[OPCOIndexMap[msg.sender]].metadata = _metadata;
+        emit MetadataChanged("OPCO", msg.sender);
+    }
+
     /*///////////////////////////////////////////////////////////////
                             CITIZEN LOGIC
     //////////////////////////////////////////////////////////////*/
@@ -167,13 +182,18 @@ contract BadgeAdmin is Ownable {
 
     function delegate(address _adr) external onlyCitizen {
         // ADDME: Check if _adr is a citizen
-        Citizens[CitizenIndexMap[msg.sender]].delegate = _adr;
+        Citizens[CitizenIndexMap[msg.sender]].representative = _adr;
         Citizens[CitizenIndexMap[_adr]].delegations++;
     }
 
     function undelegate(address _adr) external onlyCitizen {
-        Citizens[CitizenIndexMap[msg.sender]].delegate = address(0);
+        Citizens[CitizenIndexMap[msg.sender]].representative = address(0);
         Citizens[CitizenIndexMap[_adr]].delegations--;
+    }
+
+    function updateCitizenMetadata(string calldata _metadata) external onlyCitizen {
+        Citizens[CitizenIndexMap[msg.sender]].metadata = _metadata;
+        emit MetadataChanged("Citizen", msg.sender);
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -246,7 +266,7 @@ contract BadgeAdmin is Ownable {
 
     function _newOP(address _adr) private {
         if (OPs.length > 0) require(!isOP(_adr), "The address already has an OP role");
-        OP memory op = OP({ op: _adr });
+        OP memory op = OP({ op: _adr, metadata: "" });
         OPs.push(op);
         OPIndexMap[_adr] = OPs.length - 1;
     }
@@ -254,7 +274,13 @@ contract BadgeAdmin is Ownable {
     function _newOPCO(address _adr, uint256 _supply) private {
         if (OPCOs.length > 0) require(!isOPCO(_adr), "The address already has an OPCO role");
         address[] memory _citizens;
-        OPCO memory opco = OPCO({ co: _adr, citizens: _citizens, supply: _supply, minted: 0 });
+        OPCO memory opco = OPCO({
+            co: _adr,
+            citizens: _citizens,
+            supply: _supply,
+            minted: 0,
+            metadata: ""
+        });
         OPCOs.push(opco);
         OPCOIndexMap[_adr] = OPCOs.length - 1;
         OPCOCount++;
@@ -267,8 +293,9 @@ contract BadgeAdmin is Ownable {
             citizen: _adr,
             opco: msg.sender,
             minted: false,
-            delegate: address(0),
-            delegations: 0
+            representative: address(0),
+            delegations: 0,
+            metadata: ""
         });
         Citizens.push(citizen);
         CitizenIndexMap[_adr] = Citizens.length - 1;

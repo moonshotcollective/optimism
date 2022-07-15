@@ -64,6 +64,8 @@ contract BadgeAdminTest is Test {
 
     uint256[] testFailSupply;
 
+    string testIPFSHash;
+
     function setUp() public {
         badgeAdmin = new TBadgeAdmin();
         badge = new TBadge();
@@ -90,6 +92,8 @@ contract BadgeAdminTest is Test {
 
         testOpCoAdrArr4 = [testAdr4, testAdr5];
         testOpCoSupply4 = [15, 15];
+
+        testIPFSHash = "QmTDMoVqvyBkNMRhzvukTDznntByUNDwyNdSfV8dZ3VKRC";
 
         for (uint256 i = 0; i < 15; i++) {
             alotOfCitizens.push(testBadAdr);
@@ -154,5 +158,19 @@ contract BadgeAdminTest is Test {
         vm.prank(testAdrArr[0]);
         vm.expectRevert("Error: Sender is not Admin");
         badgeAdmin.mint();
+    }
+
+    function testUpdateOPCOMetadata() public {
+        _setup();
+
+        vm.prank(testOpCoAdr1);
+        badgeAdmin.updateOPCOMetadata(testIPFSHash);
+    }
+
+    function testUpdateCitizenMetadata() public {
+        _setup();
+
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.updateCitizenMetadata(testIPFSHash);
     }
 }
