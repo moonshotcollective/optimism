@@ -120,10 +120,9 @@ contract BadgeAdmin is Ownable {
         emit OPCOsAdded(msg.sender, OPCOCount);
     }
 
-    function updateOPMetadata(address _op, string memory _metadata) external onlyOP {
-        uint256 opIndex = OPIndexMap[_op];
-        OPs[opIndex].metadata = _metadata;
-        emit MetadataChanged("OP", _op);
+    function updateOPMetadata(string memory _metadata) external onlyOP {
+        OPs[OPIndexMap[msg.sender]].metadata = _metadata;
+        emit MetadataChanged("OP", msg.sender);
     }
 
     // TODO: Remove OPCO & OP Methods
@@ -175,6 +174,7 @@ contract BadgeAdmin is Ownable {
 
     /// @notice ToDo: Handling Burn
     function burn(uint256 _id) external {
+        require(IBadge(BadgeContract).ownerOf(_id) == msg.sender, "Error: Not badge owner");
         IBadge(BadgeContract).burn(_id);
         Citizens[CitizenIndexMap[msg.sender]].minted = false;
         OPCOs[OPCOIndexMap[Citizens[CitizenIndexMap[msg.sender]].opco]].minted--;

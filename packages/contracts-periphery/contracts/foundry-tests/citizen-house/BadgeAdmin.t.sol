@@ -173,8 +173,8 @@ contract BadgeAdminTest is Test {
         vm.prank(testAdrArr[1]);
         badgeAdmin.mint();
 
-        vm.prank(testAdrArr[0]);
-        badgeAdmin.burn(0);
+        vm.prank(testAdrArr[1]);
+        badgeAdmin.burn(1);
     }
 
     function testInvalidIdBurn() public {

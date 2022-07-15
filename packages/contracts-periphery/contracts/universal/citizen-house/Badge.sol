@@ -49,8 +49,7 @@ contract Badge is ERC721, Ownable {
     /// @notice Burn
     /// @dev Burns the soulbound ERC721.
     /// @param _id The token URI.
-    function burn(uint256 _id) external {
-        require(ownerOf(_id) == msg.sender, "Error: Not badge owner");
+    function burn(uint256 _id) external onlyAdmin {
         _burn(_id);
     }
 
