@@ -145,7 +145,10 @@ contract BadgeAdmin is Ownable {
     }
 
     function removeCitizen(address _adr) external onlyOPCO {
-        // ADDME: Check if OPCO removing the citizen is the citizen's opco
+        require(
+            Citizens[CitizenIndexMap[_adr]].opco == msg.sender,
+            "Error: OPCO does not own this citizen."
+        );
         // Remove citizen address from OPCO data storage
         _deleteOPCOCitizen(msg.sender, _adr);
         // Remove Citizen data storage
