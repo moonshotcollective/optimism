@@ -3,15 +3,10 @@ pragma solidity ^0.8.9;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import { IBadge } from "./IBadge.sol";
 
 /// @notice Admin control contract for Badge minting
 /// @author OPTIMISM + MOONSHOT COLLECTIVE
-
-interface IBadge is IERC721 {
-    function mint(address _citizen) external;
-
-    function burn(uint256 id) external;
-}
 
 contract BadgeAdmin is Ownable {
     event OPsAdded(address indexed _sender);
