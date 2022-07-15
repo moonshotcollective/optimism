@@ -79,11 +79,11 @@ contract BadgeAdminTest is Test {
 
         testAdrArr = [testOpCoAdr1, testAdr1, testAdr2];
         testAdrArr1 = [testOpCoAdr1, testAdr1, testAdr2, testAdr3];
-        testOpCoSupply = [3, 10, 5];
+        testOpCoSupply = [8, 10, 5];
         testOpCoSupply1 = [4, 5, 6, 7];
 
         testOpCoAdrArr2 = [testOpCoAdr1];
-        testOpCoSupply2 = [3];
+        testOpCoSupply2 = [4];
         testCitizenAdrArr = [testAdr1, testAdr2];
         testCitizenAdrArr1 = [testAdr1, testAdr2, testAdr3];
 
@@ -211,5 +211,39 @@ contract BadgeAdminTest is Test {
 
         vm.prank(testAdrArr[0]);
         badgeAdmin.updateCitizenMetadata(testIPFSHash);
+    }
+
+    function testCitizenRemoval() public {
+        _setup();
+        vm.prank(testOpCoAdr1);
+        badgeAdmin.removeCitizen(testAdrArr[0]);
+    }
+
+    function testBadCitizenRemoval() public {
+        _setup();
+        vm.prank(opAdr[0]);
+        badgeAdmin.addOPCOs(testOpCoAdrArr4, testOpCoSupply4);
+        vm.prank(testOpCoAdrArr4[0]);
+        vm.expectRevert("Error: Not OPCO of Citizen");
+        badgeAdmin.removeCitizen(testAdrArr[0]);
+    }
+
+    function testFailDuplicateOPCOs() public {
+        _setup();
+        vm.prank(opAdr[0]);
+        badgeAdmin.addOPCOs(testOpCoAdrArr2, testOpCoSupply2);
+    }
+
+    function testFailExceedsCitizenSupply() public {
+        _setup();
+        vm.prank(testOpCoAdr1);
+        badgeAdmin.addCitizens(alotOfCitizens);
+    }
+
+    function testFailDuplicateCitizens() public {
+        _setup();
+        vm.prank(testOpCoAdr1);
+        badgeAdmin.addCitizens(testCitizenAdrArr);
+        badgeAdmin.addCitizens(testCitizenAdrArr);
     }
 }

@@ -5,6 +5,10 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { IBadge } from "./IBadge.sol";
 
+error AlreadyOPCO(address _opco);
+error AlreadyCitizen(address _citizen);
+error ExceedsCitizenSupply(uint256 _supply);
+
 /// @notice Admin control contract for Badge minting
 /// @author OPTIMISM + MOONSHOT COLLECTIVE
 
@@ -132,12 +136,14 @@ contract BadgeAdmin is Ownable {
     //////////////////////////////////////////////////////////////*/
 
     function addCitizens(address[] calldata _adrs) external onlyOPCO {
-        require(
-            OPCOs[OPCOIndexMap[msg.sender]].citizens.length + _adrs.length <=
-                OPCOs[OPCOIndexMap[msg.sender]].supply,
-            "Error: Exceeds OPCO Supply."
-        );
+        if (
+            OPCOs[OPCOIndexMap[msg.sender]].citizens.length + _adrs.length >=
+            OPCOs[OPCOIndexMap[msg.sender]].supply
+        ) {
+            revert ExceedsCitizenSupply(OPCOs[OPCOIndexMap[msg.sender]].supply);
+        }
         require(_adrs.length <= maxCitizenLimit, "Citizen limit crossed");
+
         for (uint256 i = 0; i < _adrs.length; i++) {
             _newCitizen(_adrs[i]);
         }
@@ -145,10 +151,7 @@ contract BadgeAdmin is Ownable {
     }
 
     function removeCitizen(address _adr) external onlyOPCO {
-        require(
-            Citizens[CitizenIndexMap[_adr]].opco == msg.sender,
-            "Error: OPCO does not own this citizen."
-        );
+        require(Citizens[CitizenIndexMap[_adr]].opco == msg.sender, "Error: Not OPCO of Citizen");
         // Remove citizen address from OPCO data storage
         _deleteOPCOCitizen(msg.sender, _adr);
         // Remove Citizen data storage
@@ -276,7 +279,9 @@ contract BadgeAdmin is Ownable {
     }
 
     function _newOPCO(address _adr, uint256 _supply) private {
-        if (OPCOs.length > 0) require(!isOPCO(_adr), "The address already has an OPCO role");
+        if (OPCOs.length > 0 && isOPCO(_adr)) {
+            revert AlreadyOPCO(_adr);
+        }
         address[] memory _citizens;
         OPCO memory opco = OPCO({
             co: _adr,
@@ -291,8 +296,11 @@ contract BadgeAdmin is Ownable {
     }
 
     function _newCitizen(address _adr) private {
-        if (Citizens.length > 0)
-            require(!isCitizen(_adr), "The address already has a Citizen role");
+        // if (Citizens.length > 0)
+        //     require(!isCitizen(_adr), "The address already has a Citizen role");
+        if (Citizens.length > 0 && isCitizen(_adr)) {
+            revert AlreadyCitizen(_adr);
+        }
         Citizen memory citizen = Citizen({
             citizen: _adr,
             opco: msg.sender,
