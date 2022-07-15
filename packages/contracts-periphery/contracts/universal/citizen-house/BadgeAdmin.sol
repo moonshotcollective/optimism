@@ -174,6 +174,12 @@ contract BadgeAdmin is Ownable {
     }
 
     /// @notice ToDo: Handling Burn
+    function burn(uint256 _id) external {
+        IBadge(BadgeContract).burn(_id);
+        Citizens[CitizenIndexMap[msg.sender]].minted = false;
+        OPCOs[OPCOIndexMap[Citizens[CitizenIndexMap[msg.sender]].opco]].minted--;
+        emit Burned(msg.sender);
+    }
 
     function delegate(address _adr) external onlyCitizen {
         // ADDME: Check if _adr is a citizen

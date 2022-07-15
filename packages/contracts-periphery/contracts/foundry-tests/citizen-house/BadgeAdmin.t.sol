@@ -149,6 +149,45 @@ contract BadgeAdminTest is Test {
         badgeAdmin.mint();
     }
 
+    function testInvalidMint() public {
+        _setup();
+        vm.expectRevert("Error: Sender Not Citizen");
+        vm.prank(testBadAdr);
+        badgeAdmin.mint();
+    }
+
+    function testAlreadyMinted() public {
+        _setup();
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+        vm.expectRevert("Citizenship already minted");
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+    }
+
+    function testValidBurn() public {
+        _setup();
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+
+        vm.prank(testAdrArr[1]);
+        badgeAdmin.mint();
+
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.burn(0);
+    }
+
+    function testInvalidIdBurn() public {
+        _setup();
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+        vm.prank(testAdrArr[1]);
+        badgeAdmin.mint();
+        vm.expectRevert("Error: Not badge owner");
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.burn(1);
+    }
+
     function testInvalidAdminMint() public {
         _setup();
 

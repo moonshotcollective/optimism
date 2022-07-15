@@ -26,7 +26,7 @@ contract Badge is ERC721, Ownable {
 
     /*///////////////////////////////////////////////////////////////
                             CONSTRUCTOR
-  //////////////////////////////////////////////////////////////*/
+    //////////////////////////////////////////////////////////////*/
 
     constructor(
         string memory _name,
@@ -50,7 +50,7 @@ contract Badge is ERC721, Ownable {
     /// @dev Burns the soulbound ERC721.
     /// @param _id The token URI.
     function burn(uint256 _id) external {
-        require(_ownerOf[_id] == msg.sender, "Error: Sender is not owner");
+        require(ownerOf(_id) == msg.sender, "Error: Not badge owner");
         _burn(_id);
     }
 
@@ -75,7 +75,7 @@ contract Badge is ERC721, Ownable {
 
     /*///////////////////////////////////////////////////////////////
                             Make the Badge Soul Bound
-  //////////////////////////////////////////////////////////////*/
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice Transfer ERC721
     /// @dev Override the ERC721 transferFrom method to revert
