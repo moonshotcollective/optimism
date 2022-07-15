@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
 
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
