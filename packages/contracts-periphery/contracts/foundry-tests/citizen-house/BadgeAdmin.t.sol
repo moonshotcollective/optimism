@@ -64,7 +64,7 @@ contract BadgeAdminTest is Test {
 
     uint256[] testFailSupply;
 
-    string testIPFSHash;
+    bytes32 testIPFSHash;
 
     function setUp() public {
         badgeAdmin = new TBadgeAdmin();
@@ -93,7 +93,7 @@ contract BadgeAdminTest is Test {
         testOpCoAdrArr4 = [testAdr4, testAdr5];
         testOpCoSupply4 = [15, 15];
 
-        testIPFSHash = "QmTDMoVqvyBkNMRhzvukTDznntByUNDwyNdSfV8dZ3VKRC";
+        testIPFSHash = 0x0170171c23281b16a3c58934162488ad6d039df686eca806f21eba0cebd03486;
 
         for (uint256 i = 0; i < 15; i++) {
             alotOfCitizens.push(testBadAdr);
@@ -112,7 +112,7 @@ contract BadgeAdminTest is Test {
     }
 
     function testInvalidAddOPs() public {
-        vm.expectRevert("Error: Sender Not OP");
+        vm.expectRevert("Error: Invalid OP");
         vm.prank(testBadAdr);
         badgeAdmin.addOPs(testAdrArr);
     }
@@ -123,7 +123,7 @@ contract BadgeAdminTest is Test {
     }
 
     function testInvalidAddOPCOs() public {
-        vm.expectRevert("Error: Sender Not OP");
+        vm.expectRevert("Error: Invalid OP");
         vm.prank(0xffffff308539Da3d54F90676b52568515Ed43F39);
         badgeAdmin.addOPCOs(testAdrArr, testOpCoSupply);
     }
@@ -132,7 +132,7 @@ contract BadgeAdminTest is Test {
         vm.prank(opAdr[0]);
         badgeAdmin.addOPCOs(testAdrArr, testOpCoSupply);
         vm.prank(testBadAdr);
-        vm.expectRevert("Error: Sender Not OPCO");
+        vm.expectRevert("Error: Invalid OPCO");
         badgeAdmin.addCitizens(testAdrArr);
     }
 
@@ -151,7 +151,7 @@ contract BadgeAdminTest is Test {
 
     function testInvalidMint() public {
         _setup();
-        vm.expectRevert("Error: Sender Not Citizen");
+        vm.expectRevert("Error: Invalid Citizen");
         vm.prank(testBadAdr);
         badgeAdmin.mint();
     }
@@ -244,6 +244,36 @@ contract BadgeAdminTest is Test {
         _setup();
         vm.prank(testOpCoAdr1);
         badgeAdmin.addCitizens(testCitizenAdrArr);
+        badgeAdmin.addCitizens(testCitizenAdrArr);
+    }
+
+    function testInvalidateOPCO() public {
+        _setup();
+        vm.prank(opAdr[0]);
+        badgeAdmin.invalidateOPCO(testOpCoAdr1);
+        assertFalse(badgeAdmin.getOPCO(testOpCoAdr1).valid);
+    }
+
+    function testFailInvalidateOPCO() public {
+        _setup();
+        vm.prank(testBadAdr);
+        badgeAdmin.invalidateOPCO(testOpCoAdr1);
+        assertTrue(badgeAdmin.getOPCO(testOpCoAdr1).valid);
+    }
+
+    function testFailInvalidCitizenStatusMint() public {
+        _setup();
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.invalidateCitizen(testCitizenAdrArr[0]);
+        vm.prank(testCitizenAdrArr[0]);
+        badgeAdmin.mint();
+    }
+
+    function testFailInvalidOPCOSatusAddCitizens() public {
+        _setup();
+        vm.prank(opAdr[0]);
+        badgeAdmin.invalidateOPCO(testAdrArr[0]);
+        vm.prank(testAdrArr[0]);
         badgeAdmin.addCitizens(testCitizenAdrArr);
     }
 }

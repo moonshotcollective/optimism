@@ -26,17 +26,20 @@ contract BadgeAdmin is Ownable {
     //////////////////////////////////////////////////////////////*/
 
     modifier onlyOP() {
-        require(isOP(msg.sender), "Error: Sender Not OP");
+        require(isOP(msg.sender), "Error: Invalid OP");
         _;
     }
 
     modifier onlyOPCO() {
-        require(isOPCO(msg.sender), "Error: Sender Not OPCO");
+        require(isOPCO(msg.sender) && OPCOs[OPCOIndexMap[msg.sender]].valid, "Error: Invalid OPCO");
         _;
     }
 
     modifier onlyCitizen() {
-        require(isCitizen(msg.sender), "Error: Sender Not Citizen");
+        require(
+            isCitizen(msg.sender) && Citizens[CitizenIndexMap[msg.sender]].valid,
+            "Error: Invalid Citizen"
+        );
         _;
     }
 
@@ -46,24 +49,26 @@ contract BadgeAdmin is Ownable {
 
     struct OP {
         address op;
-        string metadata;
+        bytes32 metadata;
     }
 
     struct OPCO {
         address co;
+        bool valid;
         address[] citizens;
         uint256 supply;
         uint256 minted;
-        string metadata;
+        bytes32 metadata;
     }
 
     struct Citizen {
         address citizen;
-        address opco;
+        bool valid;
         bool minted;
+        address opco;
         address representative;
         uint256 delegations;
-        string metadata;
+        bytes32 metadata;
     }
 
     uint256 public CitizenCount;
@@ -124,9 +129,13 @@ contract BadgeAdmin is Ownable {
         emit OPCOsAdded(msg.sender, OPCOCount);
     }
 
-    function updateOPMetadata(string memory _metadata) external onlyOP {
+    function updateOPMetadata(bytes32 _metadata) external onlyOP {
         OPs[OPIndexMap[msg.sender]].metadata = _metadata;
         emit MetadataChanged("OP", msg.sender);
+    }
+
+    function invalidateOPCO(address _opco) external onlyOP {
+        OPCOs[OPCOIndexMap[_opco]].valid = false;
     }
 
     // TODO: Remove OPCO & OP Methods
@@ -159,9 +168,17 @@ contract BadgeAdmin is Ownable {
         emit CitizenRemoved(msg.sender, _adr);
     }
 
-    function updateOPCOMetadata(string calldata _metadata) external onlyOPCO {
+    function updateOPCOMetadata(bytes32 _metadata) external onlyOPCO {
         OPCOs[OPCOIndexMap[msg.sender]].metadata = _metadata;
         emit MetadataChanged("OPCO", msg.sender);
+    }
+
+    function invalidateCitizen(address _citizen) external onlyOPCO {
+        require(
+            Citizens[CitizenIndexMap[_citizen]].opco == msg.sender,
+            "Error: Not OPCO of Citizen"
+        );
+        Citizens[CitizenIndexMap[_citizen]].valid = false;
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -198,7 +215,7 @@ contract BadgeAdmin is Ownable {
         Citizens[CitizenIndexMap[_adr]].delegations--;
     }
 
-    function updateCitizenMetadata(string calldata _metadata) external onlyCitizen {
+    function updateCitizenMetadata(bytes32 _metadata) external onlyCitizen {
         Citizens[CitizenIndexMap[msg.sender]].metadata = _metadata;
         emit MetadataChanged("Citizen", msg.sender);
     }
@@ -285,10 +302,11 @@ contract BadgeAdmin is Ownable {
         address[] memory _citizens;
         OPCO memory opco = OPCO({
             co: _adr,
+            valid: true,
             citizens: _citizens,
             supply: _supply,
             minted: 0,
-            metadata: ""
+            metadata: bytes32(0)
         });
         OPCOs.push(opco);
         OPCOIndexMap[_adr] = OPCOs.length - 1;
@@ -303,11 +321,12 @@ contract BadgeAdmin is Ownable {
         }
         Citizen memory citizen = Citizen({
             citizen: _adr,
+            valid: true,
             opco: msg.sender,
             minted: false,
             representative: address(0),
-            delegations: 0,
-            metadata: ""
+            delegations: 1,
+            metadata: bytes32(0)
         });
         Citizens.push(citizen);
         CitizenIndexMap[_adr] = Citizens.length - 1;
@@ -318,7 +337,7 @@ contract BadgeAdmin is Ownable {
     function _deleteCitizen(address _adr) private {
         // ADDME: check if the index map is maxint (i.e. already deleted)
         uint256 _delIndex = CitizenIndexMap[_adr];
-        // move all elements to the left, starting from the index + 1
+        // move all elements to the left, starting from the deletion index + 1
         for (uint256 i = _delIndex; i < Citizens.length - 1; i++) {
             Citizens[i] = Citizens[i + 1];
         }
@@ -338,7 +357,7 @@ contract BadgeAdmin is Ownable {
             }
             // TODO: add revert
         }
-        // move all elements to the left, starting from index + 1
+        // move all elements to the left, starting from the deletion index + 1
         for (uint256 i = _delIndex; i < OPCOs[_opcoIndex].citizens.length - 1; i++) {
             OPCOs[OPCOIndexMap[_opco]].citizens[i] = OPCOs[_opcoIndex].citizens[i + 1];
         }
