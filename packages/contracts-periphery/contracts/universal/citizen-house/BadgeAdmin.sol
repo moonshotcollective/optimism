@@ -314,8 +314,6 @@ contract BadgeAdmin is Ownable {
     }
 
     function _newCitizen(address _adr) private {
-        // if (Citizens.length > 0)
-        //     require(!isCitizen(_adr), "The address already has a Citizen role");
         if (Citizens.length > 0 && isCitizen(_adr)) {
             revert AlreadyCitizen(_adr);
         }
