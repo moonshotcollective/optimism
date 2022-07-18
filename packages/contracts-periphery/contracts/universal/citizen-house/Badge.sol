@@ -6,28 +6,48 @@ import { ERC721 } from "@rari-capital/solmate/src/tokens/ERC721.sol";
 import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
+/**
+ * @notice Reverts with a Soulbound error
+ *
+ * @param _method Name of the function that is being reverted
+ */
 error Soulbound(string _method);
 
-/// @notice A minimalist soulbound ERC-721 Badge implementaion
-/// @author OPTIMISM + MOONSHOT COLLECTIVE
-
+/**
+ * @title Badge contract
+ * @notice A minimalist soulbound ERC-721 Badge implementation
+ * @author OPTIMISM + MOONSHOT COLLECTIVE
+ */
 contract Badge is ERC721, Ownable {
-    event Minted(address indexed _minter, address indexed _opco);
-    event Burned(address indexed _burner);
+    /**
+     * @notice adminContract address i.e BadgeAdmin address
+     */
+    address public adminContract;
 
+    /**
+     * @notice BaseURI of the NFT
+     */
+    string private baseURI;
+
+    /**
+     * @notice Total supply of the NFT
+     */
+    uint256 private totalSupply;
+
+    /**
+     * @notice Modifier to only allow adminContract i.e BadgeAdmin contract
+     * to make certain function calls
+     */
     modifier onlyAdmin() {
-        require(msg.sender == AdminContract, "Error: Sender is not Admin");
+        require(msg.sender == adminContract, "Error: Sender is not Admin");
         _;
     }
 
-    address public AdminContract;
-    string private baseURI;
-    uint256 private totalSupply;
-
-    /*///////////////////////////////////////////////////////////////
-                            CONSTRUCTOR
-    //////////////////////////////////////////////////////////////*/
-
+    /**
+     * @param _name Name of the NFT
+     * @param _symbol Symbol of the NFT
+     * @param _baseURI BaseURI of the NFT
+     */
     constructor(
         string memory _name,
         string memory _symbol,
@@ -36,72 +56,85 @@ contract Badge is ERC721, Ownable {
         baseURI = _baseURI;
     }
 
-    /// @notice Mint
-    /// @dev Mints the soulbound ERC721 token.
+    /**
+     * @notice Mints the soulbound badge NFT.
+     * @notice Only Admin contract i.e BadgeAdmin contract can mint the badge.
+     *
+     * @param _citizen Address of the citizen
+     */
     function mint(address _citizen) external onlyAdmin {
-        require(
-            AdminContract != address(0),
-            "Only Admin Contract can mint & Admin Contract not set"
-        );
+        require(adminContract != address(0), "Badge: Admin Contract not set");
         _mint(_citizen, totalSupply++);
     }
 
-    /// @notice Burn
-    /// @dev Burns the soulbound ERC721.
-    /// @param _id The token URI.
-    function burn(uint256 _id) external onlyAdmin {
+    /**
+     * @notice Burns the soulbound badge NFT.
+     *
+     * @param _id The token ID of the NFT
+     */
+    function burn(uint256 _id) external {
+        require(ownerOf(_id) == msg.sender, "Badge: Not badge owner");
         _burn(_id);
     }
 
-    /// @notice Token URI
-    /// @dev Generate a token URI.
-    /// @param _id The token URI.
-    function tokenURI(uint256 _id) public view override returns (string memory) {
-        return string(abi.encodePacked(baseURI, _id));
-    }
-
-    /// @notice AdminContract
-    /// @dev Update Admin Contract
+    /**
+     * @notice Updates the admin contract
+     *
+     * @param _adminContract Address of the admin contract
+     */
     function updateAdminContract(address _adminContract) external onlyOwner {
-        AdminContract = _adminContract;
+        adminContract = _adminContract;
     }
 
-    /// @notice Withdraw
-    /// @dev Withdraw the contract ETH balance
+    /**
+     * @notice Withdraw the contract ETH balance
+     */
     function withdraw() external onlyOwner {
         SafeTransferLib.safeTransferETH(msg.sender, address(this).balance);
     }
 
-    /*///////////////////////////////////////////////////////////////
-                            Make the Badge Soul Bound
-    //////////////////////////////////////////////////////////////*/
+    /**
+     * @notice Returns the the tokenURI for given NFT token ID.
+     *
+     * @param _id The token ID of the NFT
+     */
+    function tokenURI(uint256 _id) public view override returns (string memory) {
+        return string(abi.encodePacked(baseURI, _id));
+    }
 
-    /// @notice Transfer ERC721
-    /// @dev Override the ERC721 transferFrom method to revert
+    /**
+     * @notice Make the Badge Soul Bound
+     * @notice Override the ERC721 transferFrom method to revert
+     */
     function transferFrom(
         address,
         address,
         uint256
     ) public pure override {
-        // Make it ~*~ Soulbound ~*~
         revert Soulbound("transferFrom(address, address, uint256)");
     }
 
-    /// @notice Approve ERC721
-    /// @dev Override the ERC721 Approve method to revert
+    /**
+     * @notice Override the ERC721 Approve method to revert
+     */
     function approve(address, uint256) public pure override {
         revert Soulbound("approve(address, uint256)");
     }
 
-    /// @notice setApprovalForAll ERC721
-    /// @dev Override the ERC721 setApprovalForAll method to revert
+    /**
+     * @notice Override the ERC721 setApprovalForAll method to revert
+     */
     function setApprovalForAll(address, bool) public pure override {
         revert Soulbound("setApprovalForAll(address, uint256)");
     }
 
-    /// @notice ERC165 interface check function.
-    /// @param _interfaceId Interface ID to check.
-    /// @return Whether or not the interface is supported by this contract.
+    /**
+     * @notice ERC165 interface check function
+     *
+     * @param _interfaceId Interface ID to check
+     *
+     * @return Whether or not the interface is supported by this contract
+     */
     function supportsInterface(bytes4 _interfaceId) public view override returns (bool) {
         bytes4 iface1 = type(IERC165).interfaceId;
         return _interfaceId == iface1;
