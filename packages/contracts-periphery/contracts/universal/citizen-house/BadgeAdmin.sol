@@ -5,25 +5,86 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { IBadge } from "./IBadge.sol";
 
+/**
+ * @notice Reverts with an AlreadyOPCO error
+ *
+ * @param _opco opco address
+ */
 error AlreadyOPCO(address _opco);
+
+/**
+ * @notice Reverts with an AlreadyCitizen error
+ *
+ * @param _citizen citizen address
+ */
 error AlreadyCitizen(address _citizen);
+
+/**
+ * @notice Reverts with a ExceedsCitizenSupply error
+ *
+ * @param _supply citizen supply
+ */
 error ExceedsCitizenSupply(uint256 _supply);
 
-/// @notice Admin control contract for Badge minting
-/// @author OPTIMISM + MOONSHOT COLLECTIVE
-
+/**
+ * @title BadgeAdmin contract
+ * @notice An admin contract which controls who can mint the soulbound citizenship badges
+ * @author OPTIMISM + MOONSHOT COLLECTIVE
+ */
 contract BadgeAdmin is Ownable {
+    /**
+     * @notice Emitted when OPs are added
+     *
+     * @param _sender Address of the sender
+     */
     event OPsAdded(address indexed _sender);
-    event OPCOsAdded(address indexed _op, uint256 indexed _lastCursor);
-    event CitizensAdded(address indexed _opco, uint256 indexed _lastCursor);
-    event CitizenRemoved(address indexed _opco, address indexed _removed);
-    event Minted(address indexed _minter, address indexed _opco);
-    event Burned(address indexed _burner);
-    event MetadataChanged(string _role, address indexed _adr);
 
-    /*///////////////////////////////////////////////////////////////
-                              MODIFIERS
-    //////////////////////////////////////////////////////////////*/
+    /**
+     * @notice Emitted when OPCOs are added
+     *
+     * @param _op OP address
+     * @param _lastCursor Last index of the OPCO array
+     */
+    event OPCOsAdded(address indexed _op, uint256 indexed _lastCursor);
+
+    /**
+     * @notice Emitted when Citizens are added
+     *
+     * @param _opco OPCO address
+     * @param _lastCursor Last index of the Citizen array
+     */
+    event CitizensAdded(address indexed _opco, uint256 indexed _lastCursor);
+
+    /**
+     * @notice Emitted when citizens are removed
+     *
+     * @param _opco OPCO address
+     * @param _removed Address of the citizen removed
+     */
+    event CitizenRemoved(address indexed _opco, address indexed _removed);
+
+    /**
+     * @notice Emitted when successfully minted
+     *
+     * @param _minter Address of the citizen
+     * @param _opco Address of the opco
+     */
+    event Minted(address indexed _minter, address indexed _opco);
+
+    /**
+     * @notice Emitted when successfully burned
+     *
+     * @param _burner Address of the burner
+     */
+    event Burned(address indexed _burner);
+
+    /**
+     * @notice Emitted when Metadata is updated
+     *
+     * @param _role Role
+     * @param _adr Address of the opco/citizen
+     */
+    event MetadataChanged(string _role, address indexed _adr);
 
     modifier onlyOP() {
         require(isOP(msg.sender), "Error: Invalid OP");
@@ -42,10 +103,6 @@ contract BadgeAdmin is Ownable {
         );
         _;
     }
-
-    /*///////////////////////////////////////////////////////////////
-                              STORAGE
-    //////////////////////////////////////////////////////////////*/
 
     struct OP {
         address op;
