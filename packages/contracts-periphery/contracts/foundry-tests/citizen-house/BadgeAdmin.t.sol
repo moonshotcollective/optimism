@@ -5,6 +5,7 @@ pragma solidity 0.8.10;
 import { BadgeAdmin } from "../../universal/citizen-house/BadgeAdmin.sol";
 import { Badge } from "../../universal/citizen-house/Badge.sol";
 import { Test } from "forge-std/Test.sol";
+import { console } from "forge-std/console.sol";
 
 contract TBadge is Badge {
     constructor() Badge("example", "ex", "example.com") {}
@@ -138,7 +139,7 @@ contract BadgeAdminTest is Test {
 
     function testContractAddresses() public {
         _setup();
-        address a = badge.AdminContract();
+        address a = badge.adminContract();
         address b = badgeAdmin.BadgeContract();
     }
 
@@ -211,69 +212,5 @@ contract BadgeAdminTest is Test {
 
         vm.prank(testAdrArr[0]);
         badgeAdmin.updateCitizenMetadata(testIPFSHash);
-    }
-
-    function testCitizenRemoval() public {
-        _setup();
-        vm.prank(testOpCoAdr1);
-        badgeAdmin.removeCitizen(testAdrArr[0]);
-    }
-
-    function testBadCitizenRemoval() public {
-        _setup();
-        vm.prank(opAdr[0]);
-        badgeAdmin.addOPCOs(testOpCoAdrArr4, testOpCoSupply4);
-        vm.prank(testOpCoAdrArr4[0]);
-        vm.expectRevert("Error: Not OPCO of Citizen");
-        badgeAdmin.removeCitizen(testAdrArr[0]);
-    }
-
-    function testFailDuplicateOPCOs() public {
-        _setup();
-        vm.prank(opAdr[0]);
-        badgeAdmin.addOPCOs(testOpCoAdrArr2, testOpCoSupply2);
-    }
-
-    function testFailExceedsCitizenSupply() public {
-        _setup();
-        vm.prank(testOpCoAdr1);
-        badgeAdmin.addCitizens(alotOfCitizens);
-    }
-
-    function testFailDuplicateCitizens() public {
-        _setup();
-        vm.prank(testOpCoAdr1);
-        badgeAdmin.addCitizens(testCitizenAdrArr);
-        badgeAdmin.addCitizens(testCitizenAdrArr);
-    }
-
-    function testInvalidateOPCO() public {
-        _setup();
-        vm.prank(opAdr[0]);
-        badgeAdmin.invalidateOPCO(testOpCoAdr1);
-        assertFalse(badgeAdmin.getOPCO(testOpCoAdr1).valid);
-    }
-
-    function testFailInvalidateOPCO() public {
-        _setup();
-        vm.prank(testBadAdr);
-        badgeAdmin.invalidateOPCO(testOpCoAdr1);
-        assertTrue(badgeAdmin.getOPCO(testOpCoAdr1).valid);
-    }
-
-    function testFailInvalidCitizenStatusMint() public {
-        _setup();
-        vm.prank(testAdrArr[0]);
-        badgeAdmin.invalidateCitizen(testCitizenAdrArr[0]);
-        vm.prank(testCitizenAdrArr[0]);
-        badgeAdmin.mint();
-    }
-
-    function testFailInvalidOPCOSatusAddCitizens() public {
-        _setup();
-        vm.prank(opAdr[0]);
-        badgeAdmin.invalidateOPCO(testAdrArr[0]);
-        vm.prank(testAdrArr[0]);
-        badgeAdmin.addCitizens(testCitizenAdrArr);
     }
 }

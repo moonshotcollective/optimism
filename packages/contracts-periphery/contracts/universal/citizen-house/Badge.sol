@@ -72,8 +72,7 @@ contract Badge is ERC721, Ownable {
      *
      * @param _id The token ID of the NFT
      */
-    function burn(uint256 _id) external {
-        require(ownerOf(_id) == msg.sender, "Badge: Not badge owner");
+    function burn(uint256 _id) external onlyAdmin {
         _burn(_id);
     }
 
