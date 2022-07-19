@@ -161,7 +161,7 @@ contract BadgeAdminTest is Test {
         _setup();
         vm.prank(testAdrArr[0]);
         badgeAdmin.mint();
-        vm.expectRevert("Citizenship already minted");
+        vm.expectRevert("Citizen already minted");
         vm.prank(testAdrArr[0]);
         badgeAdmin.mint();
     }
@@ -184,7 +184,7 @@ contract BadgeAdminTest is Test {
         badgeAdmin.mint();
         vm.prank(testAdrArr[1]);
         badgeAdmin.mint();
-        vm.expectRevert("Error: Not badge owner");
+        vm.expectRevert("Not badge owner");
         vm.prank(testAdrArr[0]);
         badgeAdmin.burn(1);
     }
@@ -225,7 +225,7 @@ contract BadgeAdminTest is Test {
         vm.prank(opAdr[0]);
         badgeAdmin.addOPCOs(testOpCoAdrArr4, testOpCoSupply4);
         vm.prank(testOpCoAdrArr4[0]);
-        vm.expectRevert("Error: Not OPCO of Citizen");
+        vm.expectRevert("Not OPCO of Citizen");
         badgeAdmin.removeCitizen(testAdrArr[0]);
     }
 
@@ -276,5 +276,21 @@ contract BadgeAdminTest is Test {
         badgeAdmin.invalidateOPCO(testAdrArr[0]);
         vm.prank(testAdrArr[0]);
         badgeAdmin.addCitizens(testCitizenAdrArr);
+    }
+
+    function testVote() public {
+        _setup();
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+        vm.prank(testAdrArr[0]);
+        bytes memory vote = new bytes(124);
+        badgeAdmin.vote(vote);
+    }
+
+    function testFailVote() public {
+        _setup();
+        vm.prank(testBadAdr);
+        bytes memory vote = new bytes(124);
+        badgeAdmin.vote(vote);
     }
 }
