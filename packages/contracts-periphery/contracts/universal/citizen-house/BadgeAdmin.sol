@@ -364,7 +364,7 @@ contract BadgeAdmin is Ownable {
      *
      * @param _id The token ID of the NFT
      */
-    function burn(uint256 _id) external {
+    function burn(uint256 _id) external onlyCitizen {
         require(IBadge(badgeContract).ownerOf(_id) == msg.sender, "Not badge owner");
         IBadge(badgeContract).burn(_id);
         citizens[citizenIndex[msg.sender]].minted = false;
@@ -385,6 +385,8 @@ contract BadgeAdmin is Ownable {
             "Invalid delegation"
         );
         require(msg.sender != _adr, "Self-delegation not allowed");
+        require(citizens[citizenIndex[msg.sender]].minted, "Citizen has not minted");
+        require(citizens[citizenIndex[_adr]].minted, "Delegated has not minted");
         citizens[citizenIndex[msg.sender]].representative = _adr;
         citizens[citizenIndex[_adr]].delegations++;
     }

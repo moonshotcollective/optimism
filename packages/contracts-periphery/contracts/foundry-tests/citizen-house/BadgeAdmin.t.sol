@@ -86,7 +86,7 @@ contract BadgeAdminTest is Test {
         testOpCoAdrArr2 = [testOpCoAdr1];
         testOpCoSupply2 = [4];
         testCitizenAdrArr = [testAdr1, testAdr2];
-        testCitizenAdrArr1 = [testAdr1, testAdr2, testAdr3];
+        testCitizenAdrArr1 = [testAdr3];
 
         testOpCoAdrArr3 = [testOpCoAdr1, testOpCoAdr2];
         testOpCoSupply3 = [3, 2];
@@ -135,12 +135,6 @@ contract BadgeAdminTest is Test {
         vm.prank(testBadAdr);
         vm.expectRevert("Error: Invalid OPCO");
         badgeAdmin.addCitizens(testAdrArr);
-    }
-
-    function testContractAddresses() public {
-        _setup();
-        address a = badge.adminContract();
-        address b = badgeAdmin.BadgeContract();
     }
 
     function testMint() public {
@@ -292,5 +286,246 @@ contract BadgeAdminTest is Test {
         vm.prank(testBadAdr);
         bytes memory vote = new bytes(124);
         badgeAdmin.vote(vote);
+    }
+
+    /** VOTE */
+
+    function testVoting() public {
+        _setup();
+
+        // Expect to be able to vote
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.vote(new bytes(124));
+
+        // Expect to be able to overwrite vote
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.vote(new bytes(64));
+        assertTrue(badgeAdmin.getCitizen(testAdrArr[0]).ballot.length == 64);
+    }
+
+    function testVotingReverts() public {
+        _setup();
+
+        // Expect revert because voter is not a citizen
+        vm.expectRevert("Error: Invalid Citizen");
+        vm.prank(testBadAdr);
+        badgeAdmin.vote(new bytes(124));
+
+        // Expect revert beacause citizen has invalid status
+        vm.prank(testAdrArr[1]);
+        badgeAdmin.addCitizens(testCitizenAdrArr1);
+        vm.prank(testAdrArr[1]);
+        badgeAdmin.invalidateCitizen(testCitizenAdrArr1[0]);
+        vm.expectRevert("Error: Invalid Citizen");
+        vm.prank(testCitizenAdrArr1[0]);
+        badgeAdmin.vote(new bytes(124));
+
+        // Expect revert because voter has not minted
+        vm.expectRevert("Citizen has not minted");
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.vote(new bytes(124));
+
+        // Expect revert because voter has delegated to a representative
+        vm.prank(testAdrArr[1]);
+        badgeAdmin.mint();
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.delegate(testAdrArr[1]);
+        vm.expectRevert("Delegated to another citizen");
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.vote(new bytes(124));
+    }
+
+    /** DELEGATE */
+
+    function testDelegation() public {
+        _setup();
+
+        vm.prank(testAdrArr[2]);
+        badgeAdmin.mint();
+        vm.prank(testAdrArr[1]);
+        badgeAdmin.mint();
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+
+        // Expect to be able to delegate to representative
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.delegate(testAdrArr[1]);
+        assertTrue(badgeAdmin.getCitizen(testAdrArr[0]).representative == testAdrArr[1]);
+        assertTrue(badgeAdmin.getCitizen(testAdrArr[1]).delegations == 2);
+
+        // Expect to be able to delegate to another citizen
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.undelegate(testAdrArr[1]);
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.delegate(testAdrArr[2]);
+        assertTrue(badgeAdmin.getCitizen(testAdrArr[0]).representative == testAdrArr[2]);
+        assertTrue(badgeAdmin.getCitizen(testAdrArr[2]).delegations == 2);
+    }
+
+    function testDelegationReverts() public {
+        _setup();
+
+        // Expect revert because voter is not a citizen
+        vm.expectRevert("Error: Invalid Citizen");
+        vm.prank(testBadAdr);
+        badgeAdmin.delegate(testAdrArr[0]);
+
+        // Expect revert because citizen has invalid status
+        vm.prank(testAdrArr[1]);
+        badgeAdmin.addCitizens(testCitizenAdrArr1);
+        vm.prank(testAdrArr[1]);
+        badgeAdmin.invalidateCitizen(testCitizenAdrArr1[0]);
+        vm.expectRevert("Error: Invalid Citizen");
+        vm.prank(testCitizenAdrArr1[0]);
+        badgeAdmin.delegate(testAdrArr[0]);
+
+        // Expect revert because citizen has not minted
+        vm.expectRevert("Citizen has not minted");
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.delegate(testAdrArr[1]);
+
+        // Expect revert because self-delegation not allowed
+        vm.expectRevert("Self-delegation not allowed");
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.delegate(testAdrArr[0]);
+
+        // Expect revert because representative has not minted
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+        vm.expectRevert("Delegated has not minted");
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.delegate(testAdrArr[1]);
+
+        // Expect revert because representative is not a citizen
+        vm.expectRevert("Invalid delegation");
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.delegate(testBadAdr);
+    }
+
+    /** UNDELEGATE */
+
+    function testUndelegate() public {
+        _setup();
+
+        vm.prank(testAdrArr[2]);
+        badgeAdmin.mint();
+        vm.prank(testAdrArr[1]);
+        badgeAdmin.mint();
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+
+        // Expect to be able to undelegate
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.delegate(testAdrArr[1]);
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.undelegate(testAdrArr[1]);
+        assertTrue(badgeAdmin.getCitizen(testAdrArr[0]).representative == address(0));
+        assertTrue(badgeAdmin.getCitizen(testAdrArr[1]).delegations == 1);
+    }
+
+    function testUndelegateReverts() public {
+        _setup();
+
+        vm.prank(testAdrArr[2]);
+        badgeAdmin.mint();
+        vm.prank(testAdrArr[1]);
+        badgeAdmin.mint();
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+
+        // Expect to not be able to undelegate who isnt the representative
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.delegate(testAdrArr[1]);
+        vm.expectRevert("Invalid undelegate request");
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.undelegate(testAdrArr[2]);
+    }
+
+    /** MINT */
+
+    function testMinting() public {
+        _setup();
+
+        // Expect to be able to mint
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+        assertTrue(badgeAdmin.getCitizen(testAdrArr[0]).minted);
+        assertTrue(badge.balanceOf(testAdrArr[0]) == 1);
+        assertTrue(badgeAdmin.getOPCO(testOpCoAdr1).minted == 1);
+    }
+
+    function testMintingReverts() public {
+        _setup();
+
+        // Expect revert because minter is not a citizen
+        vm.expectRevert("Error: Invalid Citizen");
+        vm.prank(testBadAdr);
+        badgeAdmin.mint();
+
+        // Expect revert because citizen has invalid status
+        vm.prank(testOpCoAdr1);
+        badgeAdmin.invalidateCitizen(testAdrArr[1]);
+        vm.prank(testAdrArr[1]);
+        vm.expectRevert("Error: Invalid Citizen");
+        badgeAdmin.mint();
+
+        // Expect revert because citizen has already minted
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+        vm.expectRevert("Citizen already minted");
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+
+        assertTrue(badge.balanceOf(testAdrArr[0]) == 1);
+    }
+
+    /** BURN */
+
+    function testBurning() public {
+        _setup();
+
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+
+        // Expect to be able to burn
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.burn(0);
+        assertTrue(!badgeAdmin.getCitizen(testAdrArr[0]).minted);
+        assertTrue(badge.balanceOf(testAdrArr[0]) == 0);
+        assertTrue(badgeAdmin.getOPCO(testOpCoAdr1).minted == 0);
+    }
+
+    function testBurningReverts() public {
+        _setup();
+
+        // Expect revert because minter is not a citizen
+        vm.expectRevert("Error: Invalid Citizen");
+        vm.prank(testBadAdr);
+        badgeAdmin.burn(0);
+
+        // Expect revert because citizen has invalid status
+        vm.prank(testAdrArr[1]);
+        badgeAdmin.mint();
+        vm.prank(testOpCoAdr1);
+        badgeAdmin.invalidateCitizen(testAdrArr[1]);
+        vm.expectRevert("Error: Invalid Citizen");
+        vm.prank(testAdrArr[1]);
+        badgeAdmin.burn(0);
+
+        // Expect revert because citizen has not minted
+        vm.expectRevert("Not badge owner");
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.burn(0);
+
+        // Expect revert because citizen not ownerof badge id
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+        vm.expectRevert("Not badge owner");
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.burn(0);
     }
 }
