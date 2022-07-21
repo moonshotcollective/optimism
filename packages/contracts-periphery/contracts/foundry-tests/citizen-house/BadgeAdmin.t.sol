@@ -86,7 +86,7 @@ contract BadgeAdminTest is Test {
         testOpCoAdrArr2 = [testOpCoAdr1];
         testOpCoSupply2 = [4];
         testCitizenAdrArr = [testAdr1, testAdr2];
-        testCitizenAdrArr1 = [testAdr3];
+        testCitizenAdrArr1 = [testAdr3, testAdr4];
 
         testOpCoAdrArr3 = [testOpCoAdr1, testOpCoAdr2];
         testOpCoSupply3 = [3, 2];
@@ -112,29 +112,77 @@ contract BadgeAdminTest is Test {
         badge.updateAdminContract(address(badgeAdmin));
     }
 
-    function testInvalidAddOPs() public {
+    /** Test OP Control */
+
+    function testOPControl() public {
+        _setup();
+
+        // Expect to be able to add OPCOs
+        vm.prank(opAdr[0]);
+        badgeAdmin.addOPCOs(testOpCoAdrArr4, testOpCoSupply4);
+
+        // Expect to be able to add OPs
+        vm.prank(opAdr[0]);
+        badgeAdmin.addOPs(testAdrArr);
+
+        // Expect to be able to invalidate an OPCO
+        vm.prank(opAdr[0]);
+        badgeAdmin.invalidateOPCO(testOpCoAdr1);
+        assertFalse(badgeAdmin.getOPCO(testOpCoAdr1).valid);
+    }
+
+    function testOPControlReverts() public {
+        _setup();
+
+        // Expect revert when adding OPs because address is not an OP
         vm.expectRevert("Error: Invalid OP");
         vm.prank(testBadAdr);
         badgeAdmin.addOPs(testAdrArr);
-    }
 
-    function testAddOPCOs() public {
-        vm.prank(opAdr[0]);
-        badgeAdmin.addOPCOs(testAdrArr, testOpCoSupply);
-    }
-
-    function testInvalidAddOPCOs() public {
+        // Expect revert when adding OPCOs because address is not an OP
         vm.expectRevert("Error: Invalid OP");
         vm.prank(0xffffff308539Da3d54F90676b52568515Ed43F39);
         badgeAdmin.addOPCOs(testAdrArr, testOpCoSupply);
+
+        // Expect revert when invalidating an OPCO because address is not an OP
+        vm.expectRevert("Error: Invalid OP");
+        vm.prank(testBadAdr);
+        badgeAdmin.invalidateOPCO(testOpCoAdr1);
+        assertTrue(badgeAdmin.getOPCO(testOpCoAdr1).valid);
     }
 
-    function testInvalidOpCoAddCitizens() public {
-        vm.prank(opAdr[0]);
-        badgeAdmin.addOPCOs(testAdrArr, testOpCoSupply);
+    /** Test OPCO Control */
+
+    function testOPCOControl() public {
+        _setup();
+
+        // Expect to be able to add Citizens
+        vm.prank(testOpCoAdr1);
+        badgeAdmin.addCitizens(testCitizenAdrArr1);
+
+        // Expect to be able to add metadata
+        vm.prank(testOpCoAdr1);
+        badgeAdmin.updateOPCOMetadata(testIPFSHash);
+
+        // Expect to be able to remove Citizen
+        vm.prank(testOpCoAdr1);
+        badgeAdmin.removeCitizen(testAdrArr[0]);
+    }
+
+    function testOPCOControlReverts() public {
+        _setup();
+
+        // Expect revert when adding Citizens because address is not an OPCO
         vm.prank(testBadAdr);
         vm.expectRevert("Error: Invalid OPCO");
         badgeAdmin.addCitizens(testAdrArr);
+
+        // Expect revert when an OPCO tries to remove a citizen which doesn't belong to it
+        vm.prank(opAdr[0]);
+        badgeAdmin.addOPCOs(testOpCoAdrArr4, testOpCoSupply4);
+        vm.prank(testOpCoAdrArr4[0]);
+        vm.expectRevert("Not OPCO of Citizen");
+        badgeAdmin.removeCitizen(testAdrArr[0]);
     }
 
     function testMint() public {
@@ -194,39 +242,11 @@ contract BadgeAdminTest is Test {
         badgeAdmin.mint();
     }
 
-    function testUpdateOPCOMetadata() public {
-        _setup();
-
-        vm.prank(testOpCoAdr1);
-        badgeAdmin.updateOPCOMetadata(testIPFSHash);
-    }
-
     function testUpdateCitizenMetadata() public {
         _setup();
 
         vm.prank(testAdrArr[0]);
         badgeAdmin.updateCitizenMetadata(testIPFSHash);
-    }
-
-    function testCitizenRemoval() public {
-        _setup();
-        vm.prank(testOpCoAdr1);
-        badgeAdmin.removeCitizen(testAdrArr[0]);
-    }
-
-    function testBadCitizenRemoval() public {
-        _setup();
-        vm.prank(opAdr[0]);
-        badgeAdmin.addOPCOs(testOpCoAdrArr4, testOpCoSupply4);
-        vm.prank(testOpCoAdrArr4[0]);
-        vm.expectRevert("Not OPCO of Citizen");
-        badgeAdmin.removeCitizen(testAdrArr[0]);
-    }
-
-    function testFailDuplicateOPCOs() public {
-        _setup();
-        vm.prank(opAdr[0]);
-        badgeAdmin.addOPCOs(testOpCoAdrArr2, testOpCoSupply2);
     }
 
     function testFailExceedsCitizenSupply() public {
@@ -240,20 +260,6 @@ contract BadgeAdminTest is Test {
         vm.prank(testOpCoAdr1);
         badgeAdmin.addCitizens(testCitizenAdrArr);
         badgeAdmin.addCitizens(testCitizenAdrArr);
-    }
-
-    function testInvalidateOPCO() public {
-        _setup();
-        vm.prank(opAdr[0]);
-        badgeAdmin.invalidateOPCO(testOpCoAdr1);
-        assertFalse(badgeAdmin.getOPCO(testOpCoAdr1).valid);
-    }
-
-    function testFailInvalidateOPCO() public {
-        _setup();
-        vm.prank(testBadAdr);
-        badgeAdmin.invalidateOPCO(testOpCoAdr1);
-        assertTrue(badgeAdmin.getOPCO(testOpCoAdr1).valid);
     }
 
     function testFailInvalidCitizenStatusMint() public {
