@@ -61,8 +61,8 @@ contract BadgeAdmin is Ownable {
         bool minted;
         address opco;
         bytes ballot;
-        address representative;
-        uint256 delegations;
+        address delegate;
+        uint256 power;
         bytes32 metadata;
     }
 
@@ -381,19 +381,19 @@ contract BadgeAdmin is Ownable {
         require(
             isCitizen(_adr) &&
                 citizens[citizenIndex[_adr]].valid &&
-                citizens[citizenIndex[msg.sender]].representative == address(0),
+                citizens[citizenIndex[msg.sender]].delegate == address(0),
             "Invalid delegation"
         );
         require(msg.sender != _adr, "Self-delegation not allowed");
         require(citizens[citizenIndex[msg.sender]].minted, "Citizen has not minted");
         require(citizens[citizenIndex[_adr]].minted, "Delegated has not minted");
-        citizens[citizenIndex[msg.sender]].representative = _adr;
-        citizens[citizenIndex[_adr]].delegations++;
+        citizens[citizenIndex[msg.sender]].delegate = _adr;
+        citizens[citizenIndex[_adr]].power++;
     }
 
     function vote(bytes calldata _ballot) external onlyCitizen {
         require(
-            citizens[citizenIndex[msg.sender]].representative == address(0),
+            citizens[citizenIndex[msg.sender]].delegate == address(0),
             "Delegated to another citizen"
         );
         require(citizens[citizenIndex[msg.sender]].minted, "Citizen has not minted");
@@ -406,12 +406,9 @@ contract BadgeAdmin is Ownable {
      * @param _adr Address of the citizen from which voting power needs to be undelegated
      */
     function undelegate(address _adr) external onlyCitizen {
-        require(
-            citizens[citizenIndex[msg.sender]].representative == _adr,
-            "Invalid undelegate request"
-        );
-        citizens[citizenIndex[msg.sender]].representative = address(0);
-        citizens[citizenIndex[_adr]].delegations--;
+        require(citizens[citizenIndex[msg.sender]].delegate == _adr, "Invalid undelegate request");
+        citizens[citizenIndex[msg.sender]].delegate = address(0);
+        citizens[citizenIndex[_adr]].power--;
     }
 
     /**
@@ -586,8 +583,8 @@ contract BadgeAdmin is Ownable {
             opco: msg.sender,
             minted: false,
             ballot: bytes(""),
-            representative: address(0),
-            delegations: 1,
+            delegate: address(0),
+            power: 1,
             metadata: bytes32(0)
         });
         citizens.push(citizen);

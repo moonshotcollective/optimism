@@ -360,16 +360,16 @@ contract BadgeAdminTest is Test {
         // Expect to be able to delegate to representative
         vm.prank(testAdrArr[0]);
         badgeAdmin.delegate(testAdrArr[1]);
-        assertTrue(badgeAdmin.getCitizen(testAdrArr[0]).representative == testAdrArr[1]);
-        assertTrue(badgeAdmin.getCitizen(testAdrArr[1]).delegations == 2);
+        assertTrue(badgeAdmin.getCitizen(testAdrArr[0]).delegate == testAdrArr[1]);
+        assertTrue(badgeAdmin.getCitizen(testAdrArr[1]).power == 2);
 
         // Expect to be able to delegate to another citizen
         vm.prank(testAdrArr[0]);
         badgeAdmin.undelegate(testAdrArr[1]);
         vm.prank(testAdrArr[0]);
         badgeAdmin.delegate(testAdrArr[2]);
-        assertTrue(badgeAdmin.getCitizen(testAdrArr[0]).representative == testAdrArr[2]);
-        assertTrue(badgeAdmin.getCitizen(testAdrArr[2]).delegations == 2);
+        assertTrue(badgeAdmin.getCitizen(testAdrArr[0]).delegate == testAdrArr[2]);
+        assertTrue(badgeAdmin.getCitizen(testAdrArr[2]).power == 2);
     }
 
     function testDelegationReverts() public {
@@ -429,8 +429,8 @@ contract BadgeAdminTest is Test {
         badgeAdmin.delegate(testAdrArr[1]);
         vm.prank(testAdrArr[0]);
         badgeAdmin.undelegate(testAdrArr[1]);
-        assertTrue(badgeAdmin.getCitizen(testAdrArr[0]).representative == address(0));
-        assertTrue(badgeAdmin.getCitizen(testAdrArr[1]).delegations == 1);
+        assertTrue(badgeAdmin.getCitizen(testAdrArr[0]).delegate == address(0));
+        assertTrue(badgeAdmin.getCitizen(testAdrArr[1]).power == 1);
     }
 
     function testUndelegateReverts() public {
