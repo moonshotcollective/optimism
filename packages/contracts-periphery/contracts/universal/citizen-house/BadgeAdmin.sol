@@ -6,27 +6,6 @@ import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { IBadge } from "./IBadge.sol";
 
 /**
- * @notice Reverts with an AlreadyOPCO error
- *
- * @param _opco opco address
- */
-error AlreadyOPCO(address _opco);
-
-/**
- * @notice Reverts with an AlreadyCitizen error
- *
- * @param _citizen citizen address
- */
-error AlreadyCitizen(address _citizen);
-
-/**
- * @notice Reverts with a ExceedsCitizenSupply error
- *
- * @param _supply citizen supply
- */
-error ExceedsCitizenSupply(uint256 _supply);
-
-/**
  * @title BadgeAdmin contract
  * @notice An admin contract which controls who can mint the soulbound citizenship badges
  * @author OPTIMISM + MOONSHOT COLLECTIVE
@@ -283,6 +262,10 @@ contract BadgeAdmin is Ownable {
      */
     function invalidateOPCO(address _opco) external onlyOP {
         opcos[opcoIndex[_opco]].valid = false;
+        // invalidate all the opco citizens too
+        for (uint256 i = 0; i < opcos[opcoIndex[_opco]].citizens.length; i++) {
+            citizens[citizenIndex[opcos[opcoIndex[_opco]].citizens[i]]].valid = false;
+        }
     }
 
     /***********************
@@ -295,13 +278,12 @@ contract BadgeAdmin is Ownable {
      * @param _adrs Array of addresses which needs to be added to the Citizen role
      */
     function addCitizens(address[] calldata _adrs) external onlyOPCO {
-        if (
-            opcos[opcoIndex[msg.sender]].citizens.length + _adrs.length >=
-            opcos[opcoIndex[msg.sender]].supply
-        ) {
-            revert ExceedsCitizenSupply(opcos[opcoIndex[msg.sender]].supply);
-        }
-        require(_adrs.length <= maxCitizenLimit, "Citizen limit crossed");
+        require(_adrs.length <= maxCitizenLimit, "Max Citizen limit exceeded");
+        require(
+            opcos[opcoIndex[msg.sender]].citizens.length + _adrs.length <=
+                opcos[opcoIndex[msg.sender]].supply,
+            "Citizen supply exceeded"
+        );
 
         for (uint256 i = 0; i < _adrs.length; i++) {
             _newCitizen(_adrs[i]);
@@ -440,6 +422,7 @@ contract BadgeAdmin is Ownable {
      * @param _adr Address for which the role data is needed
      */
     function isOPCO(address _adr) public view returns (bool) {
+        if (opcos.length == 0) return false;
         return opcos[opcoIndex[_adr]].co == _adr;
     }
 
@@ -449,6 +432,7 @@ contract BadgeAdmin is Ownable {
      * @param _adr Address for which the role data is needed
      */
     function isCitizen(address _adr) public view returns (bool) {
+        if (citizens.length == 0) return false;
         return citizens[citizenIndex[_adr]].citizen == _adr;
     }
 
@@ -551,9 +535,9 @@ contract BadgeAdmin is Ownable {
      * @param _supply Citizen supply of the given OPCO address
      */
     function _newOPCO(address _adr, uint256 _supply) private {
-        if (opcos.length > 0 && isOPCO(_adr)) {
-            revert AlreadyOPCO(_adr);
-        }
+        require(!isCitizen(_adr), "Address already Citizen");
+        require(!isOPCO(_adr), "Address already OPCO");
+        // }
         address[] memory _citizens;
         OPCO memory opco = OPCO({
             co: _adr,
@@ -574,9 +558,8 @@ contract BadgeAdmin is Ownable {
      * @param _adr Address that needs to be added to the Citizen role
      */
     function _newCitizen(address _adr) private {
-        if (citizens.length > 0 && isCitizen(_adr)) {
-            revert AlreadyCitizen(_adr);
-        }
+        require(!isCitizen(_adr), "Address already Citizen");
+        require(!isOPCO(_adr), "Address already OPCO");
         Citizen memory citizen = Citizen({
             citizen: _adr,
             valid: true,
@@ -625,7 +608,6 @@ contract BadgeAdmin is Ownable {
                 _delIndex = i;
                 break;
             }
-            // TODO: add revert
         }
         // move all elements to the left, starting from the deletion index + 1
         for (uint256 i = _delIndex; i < opcos[_opcoIndex].citizens.length - 1; i++) {

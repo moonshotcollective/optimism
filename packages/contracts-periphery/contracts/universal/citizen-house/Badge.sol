@@ -7,13 +7,6 @@ import { IERC165 } from "@openzeppelin/contracts/utils/introspection/IERC165.sol
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
- * @notice Reverts with a Soulbound error
- *
- * @param _method Name of the function that is being reverted
- */
-error Soulbound(string _method);
-
-/**
  * @title Badge contract
  * @notice A minimalist soulbound ERC-721 Badge implementation
  * @author OPTIMISM + MOONSHOT COLLECTIVE
@@ -110,21 +103,21 @@ contract Badge is ERC721, Ownable {
         address,
         uint256
     ) public pure override {
-        revert Soulbound("transferFrom(address, address, uint256)");
+        revert("SOULBOUND");
     }
 
     /**
      * @notice Override the ERC721 Approve method to revert
      */
     function approve(address, uint256) public pure override {
-        revert Soulbound("approve(address, uint256)");
+        revert("SOULBOUND");
     }
 
     /**
      * @notice Override the ERC721 setApprovalForAll method to revert
      */
     function setApprovalForAll(address, bool) public pure override {
-        revert Soulbound("setApprovalForAll(address, uint256)");
+        revert("SOULBOUND");
     }
 
     /**
