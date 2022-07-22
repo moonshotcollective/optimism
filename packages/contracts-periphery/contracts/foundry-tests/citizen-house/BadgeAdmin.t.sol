@@ -185,113 +185,48 @@ contract BadgeAdminTest is Test {
         badgeAdmin.removeCitizen(testAdrArr[0]);
     }
 
-    function testMint() public {
+    /** Test Citizen Control */
+
+    function testCitizenControl() public {
         _setup();
 
+        // Expect to be able to mint badge NFT
         vm.prank(testAdrArr[0]);
         badgeAdmin.mint();
+
+        // Expect to be able to burn badge NFT
+        vm.prank(testAdrArr[1]);
+        badgeAdmin.mint();
+        vm.prank(testAdrArr[1]);
+        badgeAdmin.burn(1);
+
+        // Expect a citizen to be able to update their metadata
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.updateCitizenMetadata(testIPFSHash);
+        assertTrue(badgeAdmin.getCitizen(testAdrArr[0]).metadata == testIPFSHash);
     }
 
-    function testInvalidMint() public {
+    function testCitizenControlReverts() public {
         _setup();
+
+        // Expect revert when minting if address is not a citizen
         vm.expectRevert("Error: Invalid Citizen");
         vm.prank(testBadAdr);
         badgeAdmin.mint();
-    }
 
-    function testAlreadyMinted() public {
-        _setup();
+        // Expect revert when minting if address already minted a badge NFT
         vm.prank(testAdrArr[0]);
         badgeAdmin.mint();
         vm.expectRevert("Citizen already minted");
         vm.prank(testAdrArr[0]);
         badgeAdmin.mint();
-    }
 
-    function testValidBurn() public {
-        _setup();
-        vm.prank(testAdrArr[0]);
-        badgeAdmin.mint();
-
-        vm.prank(testAdrArr[1]);
-        badgeAdmin.mint();
-
-        vm.prank(testAdrArr[1]);
-        badgeAdmin.burn(1);
-    }
-
-    function testInvalidIdBurn() public {
-        _setup();
-        vm.prank(testAdrArr[0]);
-        badgeAdmin.mint();
+        // Expect revert when burning if address is not badge owner
         vm.prank(testAdrArr[1]);
         badgeAdmin.mint();
         vm.expectRevert("Not badge owner");
         vm.prank(testAdrArr[0]);
         badgeAdmin.burn(1);
-    }
-
-    function testInvalidAdminMint() public {
-        _setup();
-
-        vm.prank(0xb4c79daB8f259C7Aee6E5b2Aa729821864227e84); // deployer address
-        badge.updateAdminContract(0xb4c79daB8f259C7Aee6E5b2Aa729821864227e84);
-
-        vm.prank(testAdrArr[0]);
-        vm.expectRevert("Error: Sender is not Admin");
-        badgeAdmin.mint();
-    }
-
-    function testUpdateCitizenMetadata() public {
-        _setup();
-
-        vm.prank(testAdrArr[0]);
-        badgeAdmin.updateCitizenMetadata(testIPFSHash);
-    }
-
-    function testFailExceedsCitizenSupply() public {
-        _setup();
-        vm.prank(testOpCoAdr1);
-        badgeAdmin.addCitizens(alotOfCitizens);
-    }
-
-    function testFailDuplicateCitizens() public {
-        _setup();
-        vm.prank(testOpCoAdr1);
-        badgeAdmin.addCitizens(testCitizenAdrArr);
-        badgeAdmin.addCitizens(testCitizenAdrArr);
-    }
-
-    function testFailInvalidCitizenStatusMint() public {
-        _setup();
-        vm.prank(testAdrArr[0]);
-        badgeAdmin.invalidateCitizen(testCitizenAdrArr[0]);
-        vm.prank(testCitizenAdrArr[0]);
-        badgeAdmin.mint();
-    }
-
-    function testFailInvalidOPCOSatusAddCitizens() public {
-        _setup();
-        vm.prank(opAdr[0]);
-        badgeAdmin.invalidateOPCO(testAdrArr[0]);
-        vm.prank(testAdrArr[0]);
-        badgeAdmin.addCitizens(testCitizenAdrArr);
-    }
-
-    function testVote() public {
-        _setup();
-        vm.prank(testAdrArr[0]);
-        badgeAdmin.mint();
-        vm.prank(testAdrArr[0]);
-        bytes memory vote = new bytes(124);
-        badgeAdmin.vote(vote);
-    }
-
-    function testFailVote() public {
-        _setup();
-        vm.prank(testBadAdr);
-        bytes memory vote = new bytes(124);
-        badgeAdmin.vote(vote);
     }
 
     /** VOTE */
@@ -533,5 +468,63 @@ contract BadgeAdminTest is Test {
         vm.expectRevert("Not badge owner");
         vm.prank(testAdrArr[0]);
         badgeAdmin.burn(0);
+    }
+
+    /** Miscellaneous */
+
+    function testInvalidAdminContractMint() public {
+        _setup();
+
+        vm.prank(0xb4c79daB8f259C7Aee6E5b2Aa729821864227e84); // deployer address
+        badge.updateAdminContract(0xb4c79daB8f259C7Aee6E5b2Aa729821864227e84);
+
+        vm.prank(testAdrArr[0]);
+        vm.expectRevert("Error: Sender is not Admin");
+        badgeAdmin.mint();
+    }
+
+    function testFailExceedsCitizenSupply() public {
+        _setup();
+        vm.prank(testOpCoAdr1);
+        badgeAdmin.addCitizens(alotOfCitizens);
+    }
+
+    function testFailDuplicateCitizens() public {
+        _setup();
+        vm.prank(testOpCoAdr1);
+        badgeAdmin.addCitizens(testCitizenAdrArr);
+        badgeAdmin.addCitizens(testCitizenAdrArr);
+    }
+
+    function testFailInvalidCitizenStatusMint() public {
+        _setup();
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.invalidateCitizen(testCitizenAdrArr[0]);
+        vm.prank(testCitizenAdrArr[0]);
+        badgeAdmin.mint();
+    }
+
+    function testFailInvalidOPCOSatusAddCitizens() public {
+        _setup();
+        vm.prank(opAdr[0]);
+        badgeAdmin.invalidateOPCO(testAdrArr[0]);
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.addCitizens(testCitizenAdrArr);
+    }
+
+    function testVote() public {
+        _setup();
+        vm.prank(testAdrArr[0]);
+        badgeAdmin.mint();
+        vm.prank(testAdrArr[0]);
+        bytes memory vote = new bytes(124);
+        badgeAdmin.vote(vote);
+    }
+
+    function testFailVote() public {
+        _setup();
+        vm.prank(testBadAdr);
+        bytes memory vote = new bytes(124);
+        badgeAdmin.vote(vote);
     }
 }

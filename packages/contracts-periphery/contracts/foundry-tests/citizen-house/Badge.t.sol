@@ -23,4 +23,10 @@ contract BadgeTest is Test {
         vm.expectRevert("Error: Sender is not Admin");
         badge.mint(testAdr1);
     }
+
+    function testInvalidBurn() public {
+        vm.prank(testAdr1);
+        vm.expectRevert("Error: Sender is not Admin");
+        badge.burn(0);
+    }
 }
