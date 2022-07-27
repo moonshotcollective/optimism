@@ -6,13 +6,20 @@ import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { IBadge } from "./IBadge.sol";
 
 /**
- * @title BadgeAdmin contract
- * @notice An admin contract which controls who can mint the soulbound citizenship badges
- * @author OPTIMISM + MOONSHOT COLLECTIVE
+ * @title  Badge Administrator
+ * @notice The Badge Administrator is intended to handle the adminstration of Citizen House and its
+ *         periphery contracts. The control is heirarchial and consists of three seperate roles:
+ *         OP, OP Company, and Citizen. The OP role grants top level access, with the ability to
+ *         add/block OP Companies, as well as other OPs. The OP Company role grants secondary
+ *         access with the ability to add/block/remove OP Company Citizens. The Citizen role grants
+ *         access to the Citizen House and its periphery contracts, namely the ability to mint a
+ *         Soulbound ERC-721 token which is used to participate by vote in a Citizen House grant
+ *         round.
+ * @author OPTIMISM + GITCOIN
  */
 contract BadgeAdmin is Ownable {
     /**
-     * @notice struct to store data of an OP
+     * @notice Represents an OP.
      */
     struct OP {
         address op;
@@ -20,7 +27,7 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice struct to store data of an OPCO
+     * @notice Represents an OP Company.
      */
     struct OPCO {
         address co;
@@ -32,7 +39,7 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice struct to store data of a Citizen
+     * @notice Represents a Citizen.
      */
     struct Citizen {
         address citizen;
@@ -46,122 +53,123 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Total count of citizens added
+     * @notice Total count of all stored Citizens
      */
+    /// REMOVE
     uint256 public citizenCount;
 
     /**
      * @notice Total count of opcos added
      */
+    /// REMOVE
     uint256 public opcoCount;
 
     /**
-     * @notice Maximum ops that can be added in a single transaction
+     * @notice Maximum number of OP roles that can assigned in a single tx.
      */
     uint256 public maxOPLimit;
 
     /**
-     * @notice Maximum opcos that can be added in a single transaction
+     * @notice Maximum number of OP company roles that can be assigned in a single tx.
      */
     uint256 public maxOPCOLimit;
 
     /**
-     * @notice Maximum citizens that can be added in a single transaction
+     * @notice Maximum number of Citizen roles that can be assigned in a single tx.
      */
     uint256 public maxCitizenLimit;
 
     /**
-     * @notice Array of OP structs
+     * @notice OP storage.
      */
     OP[] internal ops;
 
     /**
-     * @notice Array of OPCO structs
+     * @notice OP Company storage.
      */
     OPCO[] internal opcos;
 
     /**
-     * @notice Array of Citizen structs
+     * @notice Citizen storage.
      */
     Citizen[] internal citizens;
 
     /**
-     * @notice Address of the Badge Contract
+     * @notice Citizen Badge Contract address.
      */
-    address public badgeContract;
+    address public BadgeContract;
 
     /**
-     * @notice Mapping to store index of a given OP address in the ops Array
+     * @notice Maps from address to the OP role index.
      */
     mapping(address => uint256) internal opIndex;
 
     /**
-     * @notice Mapping to store index of a given OPCO address in the opcos Array
+     * @notice Maps from address to the OP Company role index.
      */
     mapping(address => uint256) internal opcoIndex;
 
     /**
-     * @notice Mapping to store index of a given citizen address in the citizens Array
+     * @notice Maps from address to the Citizen role index.
      */
     mapping(address => uint256) internal citizenIndex;
 
     /**
-     * @notice Emitted when ops are added
+     * @notice Emitted when OP role(s) are assigned.
      *
-     * @param _sender Address of the sender
+     * @param _op Address of the OP caller.
      */
-    event OPsAdded(address indexed _sender);
+    event OPsAdded(address indexed _op);
 
     /**
-     * @notice Emitted when opcos are added
+     * @notice Emitted when OP Company role(s) are assigned.
      *
-     * @param _op OP address
-     * @param _lastCursor Last index of the OPCO array
+     * @param _op Address of the OP caller.
+     * @param _lastCursor Last cursor of the OP Company roles.
      */
     event OPCOsAdded(address indexed _op, uint256 indexed _lastCursor);
 
     /**
-     * @notice Emitted when citizens are added
+     * @notice Emitted when Citizen role(s) are assigned.
      *
-     * @param _opco OPCO address
-     * @param _lastCursor Last index of the Citizen array
+     * @param _opco Address of the OPCO caller.
+     * @param _lastCursor Last cursor of the Citizen roles.
      */
     event CitizensAdded(address indexed _opco, uint256 indexed _lastCursor);
 
     /**
-     * @notice Emitted when citizens are removed
+     * @notice Emitted when a Citizen is removed.
      *
-     * @param _opco OPCO address
-     * @param _removed Address of the citizen removed
+     * @param _opco Address of the OPCO caller.
+     * @param _removed Address of the removed Citizen.
      */
     event CitizenRemoved(address indexed _opco, address indexed _removed);
 
     /**
-     * @notice Emitted when badge NFT is successfully minted
+     * @notice Emitted when the Citizen Badge is minted.
      *
-     * @param _minter Address of the citizen
-     * @param _opco Address of the opco
+     * @param _minter Address of the Citizen caller.
+     * @param _opco Address of the Citizen's OPCO.
      */
     event Minted(address indexed _minter, address indexed _opco);
 
     /**
-     * @notice Emitted when badge NFT is successfully burned
+     * @notice Emitted when Citizen Badge is burned.
      *
-     * @param _burner Address of the burner
+     * @param _burner Address of the Citizen caller.
      */
     event Burned(address indexed _burner);
 
     /**
-     * @notice Emitted when Metadata is updated
+     * @notice Emitted when a role's metadata is updated.
      *
-     * @param _role Role
-     * @param _adr Address of the opco/citizen
+     * @param _role Role of caller that updated its metadata.
+     * @param _adr Address of the caller that updated its metadata.
      */
     event MetadataChanged(string _role, address indexed _adr);
 
     /**
-     * @notice Modifier to only allow addresses with valid OP role to make
-     * certain function calls
+     * @notice Modifier that prevents callers other than an OP from calling the function.
      */
     modifier onlyOP() {
         require(isOP(msg.sender), "Error: Invalid OP");
@@ -169,8 +177,8 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Modifier to only allow addresses with valid OPCO role to make
-     * certain function calls
+     * @notice Modifier that prevents callers other than an OP Company from calling the function.
+     *         Note: The OP Company caller must not be invalidated.
      */
     modifier onlyOPCO() {
         require(isOPCO(msg.sender) && opcos[opcoIndex[msg.sender]].valid, "Error: Invalid OPCO");
@@ -178,8 +186,8 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Modifier to only allow addresses with valid Citizen role to make
-     * certain function calls
+     * @notice Modifier that prevents callers other than a Citizen from calling the function.
+     *         Note: The Citizen caller must not be invalidated.
      */
     modifier onlyCitizen() {
         require(
@@ -190,11 +198,11 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @param _badgeContract Address of the Badge contract
-     * @param _maxOPLimit Maximum ops that can be added in a single transaction
-     * @param _maxOPCOLimit Maximum opcos that can be added in a single transaction
-     * @param _maxCitizenLimit Maximum citizens that can be added in a single transaction
-     * @param _ops Array of addresses that will be given OP role
+     * @param _badgeContract Address of the Citizen Badge contract.
+     * @param _maxOPLimit Maximum number of OP roles that can be assigned in a single tx.
+     * @param _maxOPCOLimit Maximum number of OP Company roles that can be assigned in a single tx.
+     * @param _maxCitizenLimit Maximum number Citizens roles that can be assigned in a single tx.
+     * @param _ops Array of addresses that will be assigned OP roles on deployment.
      */
     constructor(
         address _badgeContract,
@@ -203,7 +211,7 @@ contract BadgeAdmin is Ownable {
         uint256 _maxCitizenLimit,
         address[] memory _ops
     ) payable {
-        badgeContract = _badgeContract;
+        BadgeContract = _badgeContract;
         maxOPLimit = _maxOPLimit;
         maxOPCOLimit = _maxOPCOLimit;
         maxCitizenLimit = _maxCitizenLimit;
@@ -214,13 +222,13 @@ contract BadgeAdmin is Ownable {
     }
 
     /***********************
-     ***** OP CONTROL ******
+     ***** OP  CONTROL *****
      ***********************/
 
     /**
-     * @notice Adds given addresses to the OP role
+     * @notice Assign OP roles.
      *
-     * @param _adrs Array of addresses which needs to be added to the OP role
+     * @param _adrs Array of addresses to be assigned an OP role.
      */
     function addOPs(address[] calldata _adrs) external onlyOP {
         require(_adrs.length <= maxOPLimit, "OP limit crossed");
@@ -231,10 +239,10 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Adds given addresses to the OPCO role
+     * @notice Assign OP Company roles.
      *
-     * @param _adrs Array of addresses which needs to be added to the OPCO role
-     * @param _supplies Array of supplies for the given addresses
+     * @param _adrs Array of addresses to be assigned an OP Company role.
+     * @param _supplies Array of the mintable citizen supply for each corresponding OP Company.
      */
     function addOPCOs(address[] calldata _adrs, uint256[] memory _supplies) external onlyOP {
         require(_adrs.length <= maxOPCOLimit, "OPCO limit crossed");
@@ -245,9 +253,9 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Updates metadata hash of the OP
+     * @notice Update OP metadata.
      *
-     * @param _metadata Metadata hash
+     * @param _metadata A 32-byte hash of metadata.
      */
     function updateOPMetadata(bytes32 _metadata) external onlyOP {
         ops[opIndex[msg.sender]].metadata = _metadata;
@@ -255,27 +263,32 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Invalidate the given OPCO address i.e setting an opco as inacive
-     * or blocking an opco
+     * @notice Invalidate an OP Company.
+     *         Note: This is only callable by an OP and doing so will not only block all future
+     *         impure function calls by the OP Company, but also recursively invalidate all of
+     *         the OP Company's corresponding Citizens.
      *
-     * @param _opco OPCO address that needs to be set as invalid
+     * @param _opco Address of the OP Company to invalidate.
      */
     function invalidateOPCO(address _opco) external onlyOP {
         opcos[opcoIndex[_opco]].valid = false;
-        // invalidate all the opco citizens too
+        // Invalidate all of the OP Compnay citizens, too.
         for (uint256 i = 0; i < opcos[opcoIndex[_opco]].citizens.length; i++) {
             citizens[citizenIndex[opcos[opcoIndex[_opco]].citizens[i]]].valid = false;
         }
     }
 
     /***********************
-     **** OPCO CONTROL *****
+     **** OPCO  CONTROL ****
      ***********************/
 
     /**
-     * @notice Adds given addresses to the Citizen role
+     * @notice Assign Citizen roles.
+     *         Note: Calling this stores the a new citizen who has the ability to mint a Citizen
+     *         Badge. Duplicate ciitzens, either in the same, or different, OP Companies is not
+     *         permitted.
      *
-     * @param _adrs Array of addresses which needs to be added to the Citizen role
+     * @param _adrs Array of addresses to be assigned a Citizen role.
      */
     function addCitizens(address[] calldata _adrs) external onlyOPCO {
         require(_adrs.length <= maxCitizenLimit, "Max Citizen limit exceeded");
@@ -292,23 +305,26 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Removes given address from the Citizen role
+     * @notice Remove a Citizen.
+     *         Note: This is only callable by the Citizen's corresponding OP Company, and doing so
+     *         will replenish the mintable supply of the OP Company by completely removing the
+     *         Citizen from the contract storage.
      *
-     * @param _adr Address which needs to be removed from the Citizen role
+     * @param _adr Address of Citizen to remove.
      */
     function removeCitizen(address _adr) external onlyOPCO {
         require(citizens[citizenIndex[_adr]].opco == msg.sender, "Not OPCO of Citizen");
-        // Remove citizen address from OPCO data storage
+        // Remove the citizen from the OPCO citizen-address storage
         _deleteOPCOCitizen(msg.sender, _adr);
-        // Remove Citizen data storage
+        // Remove the citizen from the Citizen storage
         _deleteCitizen(_adr);
         emit CitizenRemoved(msg.sender, _adr);
     }
 
     /**
-     * @notice Updates metadata hash of the OPCO
+     * @notice Update OP Company metadata.
      *
-     * @param _metadata Metadata hash
+     * @param _metadata 32-byte hash of metadata.
      */
     function updateOPCOMetadata(bytes32 _metadata) external onlyOPCO {
         opcos[opcoIndex[msg.sender]].metadata = _metadata;
@@ -316,10 +332,12 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Invalidate the given Citizen address i.e setting a citizen as inacive
-     * or blocking a citizen
+     * @notice Invalidate a Citizen.
+     *         Note: This is only callable by the Citizen's corresponding OP Company, and doing so
+     *         will block all future impure function calls by the Citizen. This will not replenish
+     *         the mintable supply of the OP Company.
      *
-     * @param _citizen Citizen address that needs to be set as invalid
+     * @param _citizen Address of the Citizen to invalidate.
      */
     function invalidateCitizen(address _citizen) external onlyOPCO {
         require(msg.sender == citizens[citizenIndex[_citizen]].opco, "Not OPCO of Citizen");
@@ -331,31 +349,40 @@ contract BadgeAdmin is Ownable {
      ***********************/
 
     /**
-     * @notice Mints the soulbound badge NFT.
+     * @notice Mint a Citizen Badge.
+     *         Note: This is a ~Soulbound~ ERC721 token which is therefore non-transferable and can
+     *         only be burned by the owner of the token. Only a single token can be minted per
+     *         assigned Citizen.
      */
     function mint() external onlyCitizen {
-        require(IBadge(badgeContract).balanceOf(msg.sender) == 0, "Citizen already minted");
-        IBadge(badgeContract).mint(msg.sender);
+        require(IBadge(BadgeContract).balanceOf(msg.sender) == 0, "Citizen already minted");
+        IBadge(BadgeContract).mint(msg.sender);
         citizens[citizenIndex[msg.sender]].minted = true;
         opcos[opcoIndex[citizens[citizenIndex[msg.sender]].opco]].minted++;
         emit Minted(msg.sender, citizens[citizenIndex[msg.sender]].opco);
     }
 
     /**
-     * @notice Burns the soulbound badge NFT.
+     * @notice Burn the Citizen Badge.
+     *         Note: This is only callable by the owner of the token, and doing so will
+     *         replenish the mintable supply of the corresponding OP Company.
      *
-     * @param _id The token ID of the NFT
+     * @param _id The token ID of the Citizen Badge to burn.
      */
     function burn(uint256 _id) external onlyCitizen {
-        require(IBadge(badgeContract).ownerOf(_id) == msg.sender, "Not badge owner");
-        IBadge(badgeContract).burn(_id);
+        require(IBadge(BadgeContract).ownerOf(_id) == msg.sender, "Not badge owner");
+        IBadge(BadgeContract).burn(_id);
         citizens[citizenIndex[msg.sender]].minted = false;
         opcos[opcoIndex[citizens[citizenIndex[msg.sender]].opco]].minted--;
         emit Burned(msg.sender);
     }
 
     /**
-     * @notice Delegates the badge voting power to a different citizen
+     * @notice Delegate a Citizen Badge to another Citizen.
+     *         Note: This is only callable by the owner of the token, and doing so will increment
+     *         the power of the delegatee. The power of the delegator will be decremented which
+     *         absolves the ability to participate by vote. The delegatee must own a valid
+     *         Citizen Badge.
      *
      * @param _adr Address to which the badge voting power needs to be delegated
      */
@@ -366,13 +393,21 @@ contract BadgeAdmin is Ownable {
                 citizens[citizenIndex[msg.sender]].delegate == address(0),
             "Invalid delegation"
         );
+        require(citizens[citizenIndex[_adr]].ballot.length == 0, "Delegatee already voted");
         require(msg.sender != _adr, "Self-delegation not allowed");
         require(citizens[citizenIndex[msg.sender]].minted, "Citizen has not minted");
-        require(citizens[citizenIndex[_adr]].minted, "Delegated has not minted");
+        require(citizens[citizenIndex[_adr]].minted, "Delegatee has not minted");
         citizens[citizenIndex[msg.sender]].delegate = _adr;
         citizens[citizenIndex[_adr]].power++;
     }
 
+    /**
+     * @notice Submit a Vote.
+     *         Note: This is only callable by a valid owner of the Citizen Badge token who has not
+     *         delegated to another Citizen.
+     *
+     * @param _ballot Ballot data.
+     */
     function vote(bytes calldata _ballot) external onlyCitizen {
         require(
             citizens[citizenIndex[msg.sender]].delegate == address(0),
@@ -383,11 +418,18 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Undelegates the badge voting power
+     * @notice Undelegate a Citizen Badge.
+     *         Note: This is only callable by a valid owner of the Citizen Badge token who has
+     *         delegated to another Citizen. Doing so will decrement the power of the delegatee and
+     *         resolve the Citizen's ability to participate by vote.
      *
      * @param _adr Address of the citizen from which voting power needs to be undelegated
      */
     function undelegate(address _adr) external onlyCitizen {
+        require(
+            citizens[citizenIndex[_adr]].ballot.length == 0,
+            "Delegatee has submitted a ballot"
+        );
         require(citizens[citizenIndex[msg.sender]].delegate == _adr, "Invalid undelegate request");
         citizens[citizenIndex[msg.sender]].delegate = address(0);
         citizens[citizenIndex[_adr]].power--;
@@ -396,7 +438,7 @@ contract BadgeAdmin is Ownable {
     /**
      * @notice Updates metadata hash of the Citizen
      *
-     * @param _metadata Metadata hash
+     * @param _metadata 32-byte metadata hash
      */
     function updateCitizenMetadata(bytes32 _metadata) external onlyCitizen {
         citizens[citizenIndex[msg.sender]].metadata = _metadata;
@@ -408,18 +450,18 @@ contract BadgeAdmin is Ownable {
      ***********************/
 
     /**
-     * @notice Returns whether the given address has the OP role or not
+     * @notice Check if a given address is an OP.
      *
-     * @param _adr Address for which the role data is needed
+     * @param _adr Address to check.
      */
     function isOP(address _adr) public view returns (bool) {
         return ops[opIndex[_adr]].op == _adr;
     }
 
     /**
-     * @notice Returns whether the given address has the OPCO role or not
+     * @notice Check if a given address is an OPCO.
      *
-     * @param _adr Address for which the role data is needed
+     * @param _adr Address to check.
      */
     function isOPCO(address _adr) public view returns (bool) {
         if (opcos.length == 0) return false;
@@ -427,9 +469,9 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Returns whether the given address has the Citizen role or not
+     * @notice Check if a given address is a Citizen.
      *
-     * @param _adr Address for which the role data is needed
+     * @param _adr Address to check.
      */
     function isCitizen(address _adr) public view returns (bool) {
         if (citizens.length == 0) return false;
@@ -437,27 +479,26 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Returns the array of all the ops
+     * @notice Get an array of all the OPs.
      */
     function getOPs() external view returns (OP[] memory) {
         return ops;
     }
 
     /**
-     * @notice Returns the OP struct data for the given OP address
+     * @notice Get an OP by address.
      *
-     * @param _adr Address for which the data is needed
+     * @param _adr Address to obtain data for.
      */
     function getOP(address _adr) external view returns (OP memory) {
         return ops[opIndex[_adr]];
     }
 
     /**
-     * @notice Returns the array of opcos starting from the given
-     * cursor i.e index of the opcos array
+     * @notice Get the paginated list of OPs.
      *
-     * @param cursor Index of the opcos array
-     * @param count The number of OPCO structs to be returned starting from the cursor index
+     * @param cursor The list cursor.
+     * @param count The count of items to return after the cursor.
      */
     function getOPCOs(uint256 cursor, uint256 count)
         public
@@ -476,20 +517,19 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Returns the OPCO struct data for the given OPCO address
+     * @notice Get an OPCO by address.
      *
-     * @param _adr Address for which the data is needed
+     * @param _adr Address to obtain data for.
      */
     function getOPCO(address _adr) public view returns (OPCO memory) {
         return opcos[opcoIndex[_adr]];
     }
 
     /**
-     * @notice Returns the array of citizens starting from the given
-     * cursor i.e index of the citizens array
+     * @notice Get the paginated list of Citizens.
      *
-     * @param cursor Index of the citizens array
-     * @param count The number of Citizen structs to be returned starting from the cursor index
+     * @param cursor The list cursor.
+     * @param count The count of items to return after the cursor.
      */
     function getCitizens(uint256 cursor, uint256 count)
         public
@@ -508,18 +548,18 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Returns the Citizen struct data for the given Citizen address
+     * @notice Get a Citizen by address.
      *
-     * @param _adr Address for which the data is needed
+     * @param _adr Address to obtain data for.
      */
     function getCitizen(address _adr) public view returns (Citizen memory) {
         return citizens[citizenIndex[_adr]];
     }
 
     /**
-     * @notice Internal function to add an address to the OP role
+     * @notice (Internal) Initialize a new OP.
      *
-     * @param _adr Address that needs to be added to the OP role
+     * @param _adr Address of the OP.
      */
     function _newOP(address _adr) private {
         if (ops.length > 0) require(!isOP(_adr), "Address already OP");
@@ -529,15 +569,14 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Internal function to add an address to the OPCO role
+     * @notice (Internal) Initialize a new OPCO.
      *
-     * @param _adr Address that needs to be added to the OPCO role
-     * @param _supply Citizen supply of the given OPCO address
+     * @param _adr Address of the OPCO.
+     * @param _supply The mintable citizen badge supply of the OPCO.
      */
     function _newOPCO(address _adr, uint256 _supply) private {
         require(!isCitizen(_adr), "Address already Citizen");
         require(!isOPCO(_adr), "Address already OPCO");
-        // }
         address[] memory _citizens;
         OPCO memory opco = OPCO({
             co: _adr,
@@ -553,9 +592,9 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Internal function to add an address to the Citizen role
+     * @notice (Internal) Initialize a new Citizen.
      *
-     * @param _adr Address that needs to be added to the Citizen role
+     * @param _adr Address of the Citizen.
      */
     function _newCitizen(address _adr) private {
         require(!isCitizen(_adr), "Address already Citizen");
@@ -577,12 +616,12 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Internal function to delete an address from the Citizen role
+     * @notice (Internal) Delate a Citizen.
+     *         Note: This completely removes the citizen from the Citizen contract storage.
      *
-     * @param _adr Address that needs to be deleted from the Citizen role
+     * @param _adr Address of the citizen to delete.
      */
     function _deleteCitizen(address _adr) private {
-        // ADDME: check if the index map is maxint (i.e. already deleted)
         uint256 _delIndex = citizenIndex[_adr];
         // move all elements to the left, starting from the deletion index + 1
         for (uint256 i = _delIndex; i < citizens.length - 1; i++) {
@@ -595,10 +634,11 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Internal function to delete an address from the respective OPCO struct
+     * @notice (Internal) Delate an OPCO Citizen.
+     *         Note: This completely removes the citizen from the OPCO citizens contract storage.
      *
-     * @param _opco Address of the opco that the citizen belongs to
-     * @param _adr Address the citizen that needs to be deleted
+     * @param _opco Address of the OPCO that contains the citizen to be deleted.
+     * @param _adr Address the of the citizen to delete.
      */
     function _deleteOPCOCitizen(address _opco, address _adr) private {
         uint256 _opcoIndex = opcoIndex[_opco];
@@ -617,11 +657,11 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Updates the address of the Badge contract
+     * @notice Update the Citizen Badge Contract address.
      *
-     * @param _badgeContract Address of the new Badge contract
+     * @param _badgeContract Address of the Badge Contract
      */
     function updateBadgeContract(address _badgeContract) external onlyOwner {
-        badgeContract = _badgeContract;
+        BadgeContract = _badgeContract;
     }
 }
