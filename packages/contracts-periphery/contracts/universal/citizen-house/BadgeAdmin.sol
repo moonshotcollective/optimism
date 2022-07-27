@@ -53,18 +53,6 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice Total count of all stored Citizens
-     */
-    /// REMOVE
-    uint256 public citizenCount;
-
-    /**
-     * @notice Total count of opcos added
-     */
-    /// REMOVE
-    uint256 public opcoCount;
-
-    /**
      * @notice Maximum number of OP roles that can assigned in a single tx.
      */
     uint256 public maxOPLimit;
@@ -249,7 +237,7 @@ contract BadgeAdmin is Ownable {
         for (uint256 i = 0; i < _adrs.length; i++) {
             _newOPCO(_adrs[i], _supplies[i]);
         }
-        emit OPCOsAdded(msg.sender, opcoCount);
+        emit OPCOsAdded(msg.sender, opcos.length);
     }
 
     /**
@@ -301,7 +289,7 @@ contract BadgeAdmin is Ownable {
         for (uint256 i = 0; i < _adrs.length; i++) {
             _newCitizen(_adrs[i]);
         }
-        emit CitizensAdded(msg.sender, citizenCount);
+        emit CitizensAdded(msg.sender, citizens.length);
     }
 
     /**
@@ -557,6 +545,20 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
+     * @notice Get the current count of Citizens.
+     */
+    function getCitizenCount() public view returns (uint256) {
+        return citizens.length;
+    }
+
+    /**
+     * @notice Get the current count of OPs.
+     */
+    function getOPCount() public view returns (uint256) {
+        return ops.length;
+    }
+
+    /**
      * @notice (Internal) Initialize a new OP.
      *
      * @param _adr Address of the OP.
@@ -588,7 +590,6 @@ contract BadgeAdmin is Ownable {
         });
         opcos.push(opco);
         opcoIndex[_adr] = opcos.length - 1;
-        opcoCount++;
     }
 
     /**
@@ -612,7 +613,6 @@ contract BadgeAdmin is Ownable {
         citizens.push(citizen);
         citizenIndex[_adr] = citizens.length - 1;
         opcos[opcoIndex[msg.sender]].citizens.push(_adr);
-        citizenCount++;
     }
 
     /**
@@ -630,7 +630,6 @@ contract BadgeAdmin is Ownable {
         citizens.pop(); // delete the last item
         // set the index map to the max int value
         citizenIndex[_adr] = type(uint256).max;
-        citizenCount--;
     }
 
     /**
