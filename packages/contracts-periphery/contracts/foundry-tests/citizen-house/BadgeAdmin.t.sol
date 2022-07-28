@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.10;
+pragma solidity 0.8.15;
 
-// import "./../BadgeAdmin.sol";
 import { BadgeAdmin } from "../../universal/citizen-house/BadgeAdmin.sol";
 import { Badge } from "../../universal/citizen-house/Badge.sol";
 import { Test, stdError } from "forge-std/Test.sol";
@@ -486,7 +485,7 @@ contract BadgeAdminTest is Test {
         // Expect revert because representative has not minted
         vm.prank(citizens[0]);
         badgeAdmin.mint();
-        vm.expectRevert("Delegated has not minted");
+        vm.expectRevert("Delegatee has not minted");
         vm.prank(citizens[0]);
         badgeAdmin.delegate(citizens[1]);
 
