@@ -39,7 +39,7 @@ contract BadgeAdminTest is Test {
         badge = new TBadge();
     }
 
-    function getOPCOSet(uint256 set) public returns (address[] memory) {
+    function getOPCOSet(uint256 set) public pure returns (address[] memory) {
         address[] memory opcoAdrs = new address[](4);
         if (set == 0) {
             opcoAdrs[0] = mkadr("opco1");
@@ -76,7 +76,7 @@ contract BadgeAdminTest is Test {
         return opcoAdrs;
     }
 
-    function getCitizenSet(uint256 set) public returns (address[] memory) {
+    function getCitizenSet(uint256 set) public pure returns (address[] memory) {
         address[] memory citizenAdrs = new address[](4);
         if (set == 0) {
             citizenAdrs[0] = mkadr("citizen1");
@@ -113,7 +113,7 @@ contract BadgeAdminTest is Test {
         return citizenAdrs;
     }
 
-    function getSupplySet(uint256 set) public returns (uint256[] memory) {
+    function getSupplySet(uint256 set) public pure returns (uint256[] memory) {
         uint256[] memory supply = new uint256[](4);
         if (set == 0) {
             supply[0] = 99;
@@ -169,7 +169,6 @@ contract BadgeAdminTest is Test {
     function testOPControl() public {
         address[] memory opcoAdrs = getOPCOSet(0);
         uint256[] memory opcoSupply = getSupplySet(0);
-        address[] memory citizenAdrs = getCitizenSet(0);
 
         address[] memory testAdrs = new address[](1);
         testAdrs[0] = mkadr("alice");
@@ -265,11 +264,9 @@ contract BadgeAdminTest is Test {
         _basicSetup();
 
         address[] memory opcoAdrs = getOPCOSet(0);
-        uint256[] memory opcoSupply = getSupplySet(0);
 
         address[] memory citizenAdrs = getCitizenSet(1);
         address[] memory citizenAdrs2 = getCitizenSet(2);
-        uint256[] memory citizenSupply = getSupplySet(2);
 
         // Expect revert when adding Citizens because address is not an OPCO
         vm.prank(mkadr("baddy"));
@@ -324,7 +321,6 @@ contract BadgeAdminTest is Test {
         assertTrue(badgeAdmin.getOPCO(opcoAdrs[0]).minted > 0);
 
         // Expect to be able to burn badge NFT
-        uint256 opcoMinted = badgeAdmin.getOPCO(opcoAdrs[0]).minted;
         vm.prank(citizens[1]);
         badgeAdmin.mint();
         vm.prank(citizens[1]);
@@ -425,9 +421,7 @@ contract BadgeAdminTest is Test {
     function testDelegation() public {
         _basicSetup();
 
-        address[] memory opcoAdrs = getOPCOSet(0);
         address[] memory citizens = getCitizenSet(0);
-        address[] memory citizens2 = getCitizenSet(1);
 
         vm.prank(citizens[2]);
         badgeAdmin.mint();
@@ -500,9 +494,7 @@ contract BadgeAdminTest is Test {
     function testUndelegate() public {
         _basicSetup();
 
-        address[] memory opcoAdrs = getOPCOSet(0);
         address[] memory citizens = getCitizenSet(0);
-        address[] memory citizens2 = getCitizenSet(1);
 
         vm.prank(citizens[2]);
         badgeAdmin.mint();
@@ -523,9 +515,7 @@ contract BadgeAdminTest is Test {
     function testUndelegateReverts() public {
         _basicSetup();
 
-        address[] memory opcoAdrs = getOPCOSet(0);
         address[] memory citizens = getCitizenSet(0);
-        address[] memory citizens2 = getCitizenSet(1);
 
         vm.prank(citizens[2]);
         badgeAdmin.mint();
@@ -549,7 +539,6 @@ contract BadgeAdminTest is Test {
 
         address[] memory opcoAdrs = getOPCOSet(0);
         address[] memory citizens = getCitizenSet(0);
-        address[] memory citizens2 = getCitizenSet(1);
 
         // Expect to be able to mint
         vm.prank(citizens[0]);
@@ -564,7 +553,6 @@ contract BadgeAdminTest is Test {
 
         address[] memory opcoAdrs = getOPCOSet(0);
         address[] memory citizens = getCitizenSet(0);
-        address[] memory citizens2 = getCitizenSet(1);
 
         // Expect revert because minter is not a citizen
         vm.expectRevert("Error: Invalid Citizen");
@@ -595,7 +583,6 @@ contract BadgeAdminTest is Test {
 
         address[] memory opcoAdrs = getOPCOSet(0);
         address[] memory citizens = getCitizenSet(0);
-        address[] memory citizens2 = getCitizenSet(1);
 
         vm.prank(citizens[0]);
         badgeAdmin.mint();
@@ -613,7 +600,6 @@ contract BadgeAdminTest is Test {
 
         address[] memory opcoAdrs = getOPCOSet(0);
         address[] memory citizens = getCitizenSet(0);
-        address[] memory citizens2 = getCitizenSet(1);
 
         // Expect revert because minter is not a citizen
         vm.expectRevert("Error: Invalid Citizen");
@@ -647,9 +633,7 @@ contract BadgeAdminTest is Test {
     function testSoulboundReverts() public {
         _basicSetup();
 
-        address[] memory opcoAdrs = getOPCOSet(0);
         address[] memory citizens = getCitizenSet(0);
-        address[] memory citizens2 = getCitizenSet(1);
 
         vm.prank(citizens[0]);
         badgeAdmin.mint();
