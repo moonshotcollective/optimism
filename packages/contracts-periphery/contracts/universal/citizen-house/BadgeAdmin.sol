@@ -10,7 +10,7 @@ import { IBadge } from "./IBadge.sol";
  * @notice The Badge Administrator is intended to handle the adminstration of Citizen House and its
  *         periphery contracts. The control is heirarchial and consists of three seperate roles:
  *         OP, OP Company, and Citizen. The OP role grants top level access, with the ability to
- *         add/block OP Companies, as well as other OPs. The OP Company role grants secondary
+ *         add/block OP Companies, as well as add other OPs. The OP Company role grants secondary
  *         access with the ability to add/block/remove OP Company Citizens. The Citizen role grants
  *         access to the Citizen House and its periphery contracts, namely the ability to mint a
  *         Soulbound ERC-721 token which is used to participate by vote in a Citizen House grant
@@ -107,23 +107,23 @@ contract BadgeAdmin is Ownable {
      *
      * @param _op Address of the OP caller.
      */
-    event OPsAdded(address indexed _op);
+    event OPAdded(address indexed _op);
 
     /**
      * @notice Emitted when OP Company role(s) are assigned.
      *
      * @param _op Address of the OP caller.
-     * @param _lastCursor Last cursor of the OP Company roles.
+     * @param _opco Address of OP Company.
      */
-    event OPCOsAdded(address indexed _op, uint256 indexed _lastCursor);
+    event OPCOAdded(address indexed _op, address indexed _opco);
 
     /**
      * @notice Emitted when Citizen role(s) are assigned.
      *
      * @param _opco Address of the OPCO caller.
-     * @param _lastCursor Last cursor of the Citizen roles.
+     * @param _citizen Address of Citizen.
      */
-    event CitizensAdded(address indexed _opco, uint256 indexed _lastCursor);
+    event CitizenAdded(address indexed _opco, address indexed _citizen);
 
     /**
      * @notice Emitted when a Citizen is removed.
@@ -223,7 +223,6 @@ contract BadgeAdmin is Ownable {
         for (uint256 i = 0; i < _adrs.length; i++) {
             _newOP(_adrs[i]);
         }
-        emit OPsAdded(msg.sender);
     }
 
     /**
@@ -237,7 +236,6 @@ contract BadgeAdmin is Ownable {
         for (uint256 i = 0; i < _adrs.length; i++) {
             _newOPCO(_adrs[i], _supplies[i]);
         }
-        emit OPCOsAdded(msg.sender, opcos.length);
     }
 
     /**
@@ -273,7 +271,7 @@ contract BadgeAdmin is Ownable {
     /**
      * @notice Assign Citizen roles.
      *         Note: Calling this stores the a new citizen who has the ability to mint a Citizen
-     *         Badge. Duplicate ciitzens, either in the same, or different, OP Companies is not
+     *         Badge. Duplicate ciitzens, either in the same, or different, OP Company is not
      *         permitted.
      *
      * @param _adrs Array of addresses to be assigned a Citizen role.
@@ -289,7 +287,6 @@ contract BadgeAdmin is Ownable {
         for (uint256 i = 0; i < _adrs.length; i++) {
             _newCitizen(_adrs[i]);
         }
-        emit CitizensAdded(msg.sender, citizens.length);
     }
 
     /**
@@ -590,6 +587,7 @@ contract BadgeAdmin is Ownable {
         });
         opcos.push(opco);
         opcoIndex[_adr] = opcos.length - 1;
+        emit OPCOAdded(msg.sender, _adr);
     }
 
     /**
@@ -613,6 +611,7 @@ contract BadgeAdmin is Ownable {
         citizens.push(citizen);
         citizenIndex[_adr] = citizens.length - 1;
         opcos[opcoIndex[msg.sender]].citizens.push(_adr);
+        emit CitizenAdded(msg.sender, _adr);
     }
 
     /**
