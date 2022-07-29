@@ -127,7 +127,7 @@ contract Badge is ERC721, Ownable {
      *
      * @return Whether or not the interface is supported by this contract
      */
-    function supportsInterface(bytes4 _interfaceId) public view override returns (bool) {
+    function supportsInterface(bytes4 _interfaceId) public pure override returns (bool) {
         bytes4 iface1 = type(IERC165).interfaceId;
         return _interfaceId == iface1;
     }
