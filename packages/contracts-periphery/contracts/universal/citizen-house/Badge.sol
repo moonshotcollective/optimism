@@ -9,7 +9,7 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 /**
  * @title Badge contract
  * @notice A minimalist soulbound ERC-721 Badge implementation
- * @author OPTIMISM + MOONSHOT COLLECTIVE
+ * @author OPTIMISM + GITCOIN
  */
 contract Badge is ERC721, Ownable {
     /**
@@ -103,21 +103,21 @@ contract Badge is ERC721, Ownable {
         address,
         uint256
     ) public pure override {
-        revert("SOULBOUND");
+        revert("Badge: SOULBOUND");
     }
 
     /**
      * @notice Override the ERC721 Approve method to revert
      */
     function approve(address, uint256) public pure override {
-        revert("SOULBOUND");
+        revert("Badge: SOULBOUND");
     }
 
     /**
      * @notice Override the ERC721 setApprovalForAll method to revert
      */
     function setApprovalForAll(address, bool) public pure override {
-        revert("SOULBOUND");
+        revert("Badge: SOULBOUND");
     }
 
     /**

@@ -639,17 +639,17 @@ contract BadgeAdminTest is Test {
         badgeAdmin.mint();
 
         // Expect revert transfer because badge is soulbound
-        vm.expectRevert("SOULBOUND");
+        vm.expectRevert("Badge: SOULBOUND");
         vm.prank(citizens[0]);
         badge.transferFrom(citizens[0], mkadr("baddy"), 1);
 
         // Expect revert approve because badge is soulbound
-        vm.expectRevert("SOULBOUND");
+        vm.expectRevert("Badge: SOULBOUND");
         vm.prank(citizens[0]);
         badge.approve(mkadr("baddy"), 1);
 
         // Expect revert approvalForAll because badge is soulbound
-        vm.expectRevert("SOULBOUND");
+        vm.expectRevert("Badge: SOULBOUND");
         vm.prank(citizens[0]);
         badge.setApprovalForAll(mkadr("baddy"), true);
     }
