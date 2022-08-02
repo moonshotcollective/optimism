@@ -118,6 +118,14 @@ contract BadgeAdmin is Ownable {
     event OPCOAdded(address indexed _op, address indexed _opco);
 
     /**
+     * @notice Emitted when an OP Company is invlaidated.
+     *
+     * @param _op Address of the OP caller.
+     * @param _opco Address of the invalidated OPCO.
+     */
+    event OPCOInvalidated(address indexed _op, address indexed _opco);
+
+    /**
      * @notice Emitted when Citizen role(s) are assigned.
      *
      * @param _opco Address of the OPCO caller.
@@ -134,6 +142,14 @@ contract BadgeAdmin is Ownable {
     event CitizenRemoved(address indexed _opco, address indexed _removed);
 
     /**
+     * @notice Emitted when a Citizen is invalidated.
+     *
+     * @param _opco Address of the OPCO caller.
+     * @param _citizen Address of the invaldidated Citizen.
+     */
+    event CitizenInvalidated(address indexed _opco, address indexed _citizen);
+
+    /**
      * @notice Emitted when the Citizen Badge is minted.
      *
      * @param _minter Address of the Citizen caller.
@@ -147,6 +163,22 @@ contract BadgeAdmin is Ownable {
      * @param _burner Address of the Citizen caller.
      */
     event Burned(address indexed _burner);
+
+    /**
+     * @notice Emitted when a citizen has deleagted.
+     *
+     * @param _delegate Address of the citizen delegating.
+     * @param _citizen Address of the citizen being delegated to.
+     */
+    event Delegated(address indexed _delegate, address indexed _citizen);
+
+    /**
+     * @notice Emitted when a citizen has undeleagted.
+     *
+     * @param _delegate Address of the citizen undelegating.
+     * @param _citizen Address of the citizen being undelegated from.
+     */
+    event Undelegated(address indexed _delegate, address indexed _citizen);
 
     /**
      * @notice Emitted when a role's metadata is updated.
@@ -262,6 +294,7 @@ contract BadgeAdmin is Ownable {
         for (uint256 i = 0; i < opcos[opcoIndex[_opco]].citizens.length; i++) {
             citizens[citizenIndex[opcos[opcoIndex[_opco]].citizens[i]]].valid = false;
         }
+        emit OPCOInvalidated(msg.sender, _opco);
     }
 
     /***********************
@@ -327,6 +360,7 @@ contract BadgeAdmin is Ownable {
     function invalidateCitizen(address _citizen) external onlyOPCO {
         require(msg.sender == citizens[citizenIndex[_citizen]].opco, "Not OPCO of Citizen");
         citizens[citizenIndex[_citizen]].valid = false;
+        emit CitizenInvalidated(msg.sender, _citizen);
     }
 
     /***********************
@@ -384,6 +418,7 @@ contract BadgeAdmin is Ownable {
         require(citizens[citizenIndex[_adr]].minted, "Delegatee has not minted");
         citizens[citizenIndex[msg.sender]].delegate = _adr;
         citizens[citizenIndex[_adr]].power++;
+        emit Delegated(msg.sender, _adr);
     }
 
     /**
@@ -418,6 +453,7 @@ contract BadgeAdmin is Ownable {
         require(citizens[citizenIndex[msg.sender]].delegate == _adr, "Invalid undelegate request");
         citizens[citizenIndex[msg.sender]].delegate = address(0);
         citizens[citizenIndex[_adr]].power--;
+        emit Undelegated(msg.sender, _adr);
     }
 
     /**
