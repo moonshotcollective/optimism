@@ -251,8 +251,12 @@ contract BadgeAdminTest is Test {
         // Expect to be able to remove Citizen
         vm.prank(opcoAdrs[0]);
         badgeAdmin.removeCitizen(citizenAdrs[0]);
-        vm.expectRevert(stdError.indexOOBError);
-        badgeAdmin.getCitizen(citizenAdrs[0]);
+        assertFalse(badgeAdmin.getCitizen(citizenAdrs[0]).valid);
+        assertEq(badgeAdmin.getCitizen(citizenAdrs[0]).citizen, address(0));
+        for (uint256 i = 0; i < badgeAdmin.getOPCO(opcoAdrs[0]).citizens.length; i++) {
+            // Check every citizen
+            assertFalse(badgeAdmin.getOPCO(opcoAdrs[0]).citizens[i] == citizenAdrs[0]);
+        }
 
         // Expect to be able to invalidate a citizen
         vm.prank(opcoAdrs[0]);
@@ -652,5 +656,33 @@ contract BadgeAdminTest is Test {
         vm.expectRevert("Badge: SOULBOUND");
         vm.prank(citizens[0]);
         badge.setApprovalForAll(mkadr("baddy"), true);
+    }
+
+    /** MISC */
+
+    function testGetOPCOs() public {
+        _basicSetup();
+        address[] memory opcoAdrs = getOPCOSet(0);
+        assertEq(badgeAdmin.getOPCOs(opcoAdrs).length, opcoAdrs.length);
+        // Test each opco in the array
+        for (uint256 i = 0; i < badgeAdmin.getOPCOs(opcoAdrs).length; i++) {
+            assertEq(badgeAdmin.getOPCOs(opcoAdrs)[i].co, opcoAdrs[i]);
+            assertEq(badgeAdmin.getOPCOs(opcoAdrs)[i].minted, 0);
+            assertEq(badgeAdmin.getOPCOs(opcoAdrs)[i].supply, getSupplySet(0)[i]);
+            assertTrue(badgeAdmin.getOPCOs(opcoAdrs)[i].valid);
+        }
+    }
+
+    function testGetCitizens() public {
+        _basicSetup();
+        address[] memory citizens = getCitizenSet(0);
+        assertEq(badgeAdmin.getCitizens(citizens).length, citizens.length);
+        // Test each citizen in the array
+        for (uint256 i = 0; i < badgeAdmin.getCitizens(citizens).length; i++) {
+            assertEq(badgeAdmin.getCitizens(citizens)[i].citizen, citizens[i]);
+            assertEq(badgeAdmin.getCitizens(citizens)[i].power, 1);
+            assertFalse(badgeAdmin.getCitizens(citizens)[i].minted);
+            assertTrue(badgeAdmin.getCitizens(citizens)[i].valid);
+        }
     }
 }

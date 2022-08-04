@@ -68,39 +68,25 @@ contract BadgeAdmin is Ownable {
     uint256 public maxCitizenLimit;
 
     /**
-     * @notice OP storage.
-     */
-    OP[] internal ops;
-
-    /**
-     * @notice OP Company storage.
-     */
-    OPCO[] internal opcos;
-
-    /**
-     * @notice Citizen storage.
-     */
-    Citizen[] internal citizens;
-
-    /**
      * @notice Citizen Badge Contract address.
      */
     address public BadgeContract;
 
     /**
-     * @notice Maps from address to the OP role index.
+     * @notice Maps from the address to the OP data
      */
-    mapping(address => uint256) internal opIndex;
+
+    mapping(address => OP) public ops;
 
     /**
-     * @notice Maps from address to the OP Company role index.
+     * @notice Maps from the address to the OPCO data
      */
-    mapping(address => uint256) internal opcoIndex;
+    mapping(address => OPCO) public opcos;
 
     /**
-     * @notice Maps from address to the Citizen role index.
+     * @notice Maps from the address to the Citizen data
      */
-    mapping(address => uint256) internal citizenIndex;
+    mapping(address => Citizen) public citizens;
 
     /**
      * @notice Emitted when OP role(s) are assigned.
@@ -114,6 +100,7 @@ contract BadgeAdmin is Ownable {
      *
      * @param _op Address of the OP caller.
      * @param _opco Address of OP Company.
+
      */
     event OPCOAdded(address indexed _op, address indexed _opco);
 
@@ -201,7 +188,7 @@ contract BadgeAdmin is Ownable {
      *         Note: The OP Company caller must not be invalidated.
      */
     modifier onlyOPCO() {
-        require(isOPCO(msg.sender) && opcos[opcoIndex[msg.sender]].valid, "Error: Invalid OPCO");
+        require(isOPCO(msg.sender) && opcos[msg.sender].valid, "Error: Invalid OPCO");
         _;
     }
 
@@ -210,10 +197,7 @@ contract BadgeAdmin is Ownable {
      *         Note: The Citizen caller must not be invalidated.
      */
     modifier onlyCitizen() {
-        require(
-            isCitizen(msg.sender) && citizens[citizenIndex[msg.sender]].valid,
-            "Error: Invalid Citizen"
-        );
+        require(isCitizen(msg.sender) && citizens[msg.sender].valid, "Error: Invalid Citizen");
         _;
     }
 
@@ -276,7 +260,7 @@ contract BadgeAdmin is Ownable {
      * @param _metadata A 32-byte hash of metadata.
      */
     function updateOPMetadata(bytes32 _metadata) external onlyOP {
-        ops[opIndex[msg.sender]].metadata = _metadata;
+        ops[msg.sender].metadata = _metadata;
         emit MetadataChanged("OP", msg.sender);
     }
 
@@ -289,10 +273,10 @@ contract BadgeAdmin is Ownable {
      * @param _opco Address of the OP Company to invalidate.
      */
     function invalidateOPCO(address _opco) external onlyOP {
-        opcos[opcoIndex[_opco]].valid = false;
+        opcos[_opco].valid = false;
         // Invalidate all of the OP Compnay citizens, too.
-        for (uint256 i = 0; i < opcos[opcoIndex[_opco]].citizens.length; i++) {
-            citizens[citizenIndex[opcos[opcoIndex[_opco]].citizens[i]]].valid = false;
+        for (uint256 i = 0; i < opcos[_opco].citizens.length; i++) {
+            citizens[opcos[_opco].citizens[i]].valid = false;
         }
         emit OPCOInvalidated(msg.sender, _opco);
     }
@@ -312,8 +296,7 @@ contract BadgeAdmin is Ownable {
     function addCitizens(address[] calldata _adrs) external onlyOPCO {
         require(_adrs.length <= maxCitizenLimit, "Max Citizen limit exceeded");
         require(
-            opcos[opcoIndex[msg.sender]].citizens.length + _adrs.length <=
-                opcos[opcoIndex[msg.sender]].supply,
+            opcos[msg.sender].citizens.length + _adrs.length <= opcos[msg.sender].supply,
             "Citizen supply exceeded"
         );
 
@@ -331,9 +314,7 @@ contract BadgeAdmin is Ownable {
      * @param _adr Address of Citizen to remove.
      */
     function removeCitizen(address _adr) external onlyOPCO {
-        require(citizens[citizenIndex[_adr]].opco == msg.sender, "Not OPCO of Citizen");
-        // Remove the citizen from the OPCO citizen-address storage
-        _deleteOPCOCitizen(msg.sender, _adr);
+        require(citizens[_adr].opco == msg.sender, "Not OPCO of Citizen");
         // Remove the citizen from the Citizen storage
         _deleteCitizen(_adr);
         emit CitizenRemoved(msg.sender, _adr);
@@ -345,7 +326,7 @@ contract BadgeAdmin is Ownable {
      * @param _metadata 32-byte hash of metadata.
      */
     function updateOPCOMetadata(bytes32 _metadata) external onlyOPCO {
-        opcos[opcoIndex[msg.sender]].metadata = _metadata;
+        opcos[msg.sender].metadata = _metadata;
         emit MetadataChanged("OPCO", msg.sender);
     }
 
@@ -358,8 +339,8 @@ contract BadgeAdmin is Ownable {
      * @param _citizen Address of the Citizen to invalidate.
      */
     function invalidateCitizen(address _citizen) external onlyOPCO {
-        require(msg.sender == citizens[citizenIndex[_citizen]].opco, "Not OPCO of Citizen");
-        citizens[citizenIndex[_citizen]].valid = false;
+        require(msg.sender == citizens[_citizen].opco, "Not OPCO of Citizen");
+        citizens[_citizen].valid = false;
         emit CitizenInvalidated(msg.sender, _citizen);
     }
 
@@ -376,9 +357,9 @@ contract BadgeAdmin is Ownable {
     function mint() external onlyCitizen {
         require(IBadge(BadgeContract).balanceOf(msg.sender) == 0, "Citizen already minted");
         IBadge(BadgeContract).mint(msg.sender);
-        citizens[citizenIndex[msg.sender]].minted = true;
-        opcos[opcoIndex[citizens[citizenIndex[msg.sender]].opco]].minted++;
-        emit Minted(msg.sender, citizens[citizenIndex[msg.sender]].opco);
+        citizens[msg.sender].minted = true;
+        opcos[citizens[msg.sender].opco].minted++;
+        emit Minted(msg.sender, citizens[msg.sender].opco);
     }
 
     /**
@@ -391,8 +372,8 @@ contract BadgeAdmin is Ownable {
     function burn(uint256 _id) external onlyCitizen {
         require(IBadge(BadgeContract).ownerOf(_id) == msg.sender, "Not badge owner");
         IBadge(BadgeContract).burn(_id);
-        citizens[citizenIndex[msg.sender]].minted = false;
-        opcos[opcoIndex[citizens[citizenIndex[msg.sender]].opco]].minted--;
+        citizens[msg.sender].minted = false;
+        opcos[citizens[msg.sender].opco].minted--;
         emit Burned(msg.sender);
     }
 
@@ -407,17 +388,15 @@ contract BadgeAdmin is Ownable {
      */
     function delegate(address _adr) external onlyCitizen {
         require(
-            isCitizen(_adr) &&
-                citizens[citizenIndex[_adr]].valid &&
-                citizens[citizenIndex[msg.sender]].delegate == address(0),
+            isCitizen(_adr) && citizens[_adr].valid && citizens[msg.sender].delegate == address(0),
             "Invalid delegation"
         );
-        require(citizens[citizenIndex[_adr]].ballot.length == 0, "Delegatee already voted");
+        require(citizens[_adr].ballot.length == 0, "Delegatee already voted");
         require(msg.sender != _adr, "Self-delegation not allowed");
-        require(citizens[citizenIndex[msg.sender]].minted, "Citizen has not minted");
-        require(citizens[citizenIndex[_adr]].minted, "Delegatee has not minted");
-        citizens[citizenIndex[msg.sender]].delegate = _adr;
-        citizens[citizenIndex[_adr]].power++;
+        require(citizens[msg.sender].minted, "Citizen has not minted");
+        require(citizens[_adr].minted, "Delegatee has not minted");
+        citizens[msg.sender].delegate = _adr;
+        citizens[_adr].power++;
         emit Delegated(msg.sender, _adr);
     }
 
@@ -429,12 +408,9 @@ contract BadgeAdmin is Ownable {
      * @param _ballot Ballot data.
      */
     function vote(bytes calldata _ballot) external onlyCitizen {
-        require(
-            citizens[citizenIndex[msg.sender]].delegate == address(0),
-            "Delegated to another citizen"
-        );
-        require(citizens[citizenIndex[msg.sender]].minted, "Citizen has not minted");
-        citizens[citizenIndex[msg.sender]].ballot = _ballot;
+        require(citizens[msg.sender].delegate == address(0), "Delegated to another citizen");
+        require(citizens[msg.sender].minted, "Citizen has not minted");
+        citizens[msg.sender].ballot = _ballot;
     }
 
     /**
@@ -446,13 +422,10 @@ contract BadgeAdmin is Ownable {
      * @param _adr Address of the citizen from which voting power needs to be undelegated
      */
     function undelegate(address _adr) external onlyCitizen {
-        require(
-            citizens[citizenIndex[_adr]].ballot.length == 0,
-            "Delegatee has submitted a ballot"
-        );
-        require(citizens[citizenIndex[msg.sender]].delegate == _adr, "Invalid undelegate request");
-        citizens[citizenIndex[msg.sender]].delegate = address(0);
-        citizens[citizenIndex[_adr]].power--;
+        require(citizens[_adr].ballot.length == 0, "Delegatee has submitted a ballot");
+        require(citizens[msg.sender].delegate == _adr, "Invalid undelegate request");
+        citizens[msg.sender].delegate = address(0);
+        citizens[_adr].power--;
         emit Undelegated(msg.sender, _adr);
     }
 
@@ -462,7 +435,7 @@ contract BadgeAdmin is Ownable {
      * @param _metadata 32-byte metadata hash
      */
     function updateCitizenMetadata(bytes32 _metadata) external onlyCitizen {
-        citizens[citizenIndex[msg.sender]].metadata = _metadata;
+        citizens[msg.sender].metadata = _metadata;
         emit MetadataChanged("Citizen", msg.sender);
     }
 
@@ -476,7 +449,7 @@ contract BadgeAdmin is Ownable {
      * @param _adr Address to check.
      */
     function isOP(address _adr) public view returns (bool) {
-        return ops[opIndex[_adr]].op == _adr;
+        return ops[_adr].op == _adr;
     }
 
     /**
@@ -485,8 +458,7 @@ contract BadgeAdmin is Ownable {
      * @param _adr Address to check.
      */
     function isOPCO(address _adr) public view returns (bool) {
-        if (opcos.length == 0) return false;
-        return opcos[opcoIndex[_adr]].co == _adr;
+        return opcos[_adr].co == _adr;
     }
 
     /**
@@ -495,15 +467,7 @@ contract BadgeAdmin is Ownable {
      * @param _adr Address to check.
      */
     function isCitizen(address _adr) public view returns (bool) {
-        if (citizens.length == 0) return false;
-        return citizens[citizenIndex[_adr]].citizen == _adr;
-    }
-
-    /**
-     * @notice Get an array of all the OPs.
-     */
-    function getOPs() external view returns (OP[] memory) {
-        return ops;
+        return citizens[_adr].citizen == _adr;
     }
 
     /**
@@ -512,29 +476,18 @@ contract BadgeAdmin is Ownable {
      * @param _adr Address to obtain data for.
      */
     function getOP(address _adr) external view returns (OP memory) {
-        return ops[opIndex[_adr]];
+        return ops[_adr];
     }
 
     /**
-     * @notice Get the paginated list of OPs.
-     *
-     * @param cursor The list cursor.
-     * @param count The count of items to return after the cursor.
+     * @notice Query a list of OPCOs by address.
      */
-    function getOPCOs(uint256 cursor, uint256 count)
-        public
-        view
-        returns (OPCO[] memory, uint256 newCursor)
-    {
-        uint256 length = count;
-        if (length > opcos.length - cursor) {
-            length = opcos.length - cursor;
+    function getOPCOs(address[] calldata _adrs) external view returns (OPCO[] memory) {
+        OPCO[] memory values = new OPCO[](_adrs.length);
+        for (uint256 i = 0; i < _adrs.length; i++) {
+            values[i] = opcos[_adrs[i]];
         }
-        OPCO[] memory values = new OPCO[](length);
-        for (uint256 i = 0; i < length; i++) {
-            values[i] = opcos[cursor + i];
-        }
-        return (values, count + length);
+        return values;
     }
 
     /**
@@ -543,29 +496,20 @@ contract BadgeAdmin is Ownable {
      * @param _adr Address to obtain data for.
      */
     function getOPCO(address _adr) public view returns (OPCO memory) {
-        return opcos[opcoIndex[_adr]];
+        return opcos[_adr];
     }
 
     /**
-     * @notice Get the paginated list of Citizens.
+     * @notice Query a list of Citizen Datas.
      *
-     * @param cursor The list cursor.
-     * @param count The count of items to return after the cursor.
+     * @param _adrs Address array of citizens to query.
      */
-    function getCitizens(uint256 cursor, uint256 count)
-        public
-        view
-        returns (Citizen[] memory, uint256 newCursor)
-    {
-        uint256 length = count;
-        if (length > citizens.length - cursor) {
-            length = citizens.length - cursor;
+    function getCitizens(address[] memory _adrs) public view returns (Citizen[] memory) {
+        Citizen[] memory values = new Citizen[](_adrs.length);
+        for (uint256 i = 0; i < _adrs.length; i++) {
+            values[i] = citizens[_adrs[i]];
         }
-        Citizen[] memory values = new Citizen[](length);
-        for (uint256 i = 0; i < length; i++) {
-            values[i] = citizens[cursor + i];
-        }
-        return (values, count + length);
+        return values;
     }
 
     /**
@@ -574,21 +518,7 @@ contract BadgeAdmin is Ownable {
      * @param _adr Address to obtain data for.
      */
     function getCitizen(address _adr) public view returns (Citizen memory) {
-        return citizens[citizenIndex[_adr]];
-    }
-
-    /**
-     * @notice Get the current count of Citizens.
-     */
-    function getCitizenCount() public view returns (uint256) {
-        return citizens.length;
-    }
-
-    /**
-     * @notice Get the current count of OPs.
-     */
-    function getOPCount() public view returns (uint256) {
-        return ops.length;
+        return citizens[_adr];
     }
 
     /**
@@ -597,10 +527,9 @@ contract BadgeAdmin is Ownable {
      * @param _adr Address of the OP.
      */
     function _newOP(address _adr) private {
-        if (ops.length > 0) require(!isOP(_adr), "Address already OP");
+        require(!isOP(_adr), "Address already OP");
         OP memory op = OP({ op: _adr, metadata: "" });
-        ops.push(op);
-        opIndex[_adr] = ops.length - 1;
+        ops[_adr] = op;
     }
 
     /**
@@ -621,8 +550,7 @@ contract BadgeAdmin is Ownable {
             minted: 0,
             metadata: bytes32(0)
         });
-        opcos.push(opco);
-        opcoIndex[_adr] = opcos.length - 1;
+        opcos[_adr] = opco;
         emit OPCOAdded(msg.sender, _adr);
     }
 
@@ -644,9 +572,8 @@ contract BadgeAdmin is Ownable {
             power: 1,
             metadata: bytes32(0)
         });
-        citizens.push(citizen);
-        citizenIndex[_adr] = citizens.length - 1;
-        opcos[opcoIndex[msg.sender]].citizens.push(_adr);
+        citizens[_adr] = citizen;
+        opcos[msg.sender].citizens.push(_adr);
         emit CitizenAdded(msg.sender, _adr);
     }
 
@@ -657,37 +584,22 @@ contract BadgeAdmin is Ownable {
      * @param _adr Address of the citizen to delete.
      */
     function _deleteCitizen(address _adr) private {
-        uint256 _delIndex = citizenIndex[_adr];
-        // move all elements to the left, starting from the deletion index + 1
-        for (uint256 i = _delIndex; i < citizens.length - 1; i++) {
-            citizens[i] = citizens[i + 1];
-        }
-        citizens.pop(); // delete the last item
-        // set the index map to the max int value
-        citizenIndex[_adr] = type(uint256).max;
-    }
-
-    /**
-     * @notice (Internal) Delate an OPCO Citizen.
-     *         Note: This completely removes the citizen from the OPCO citizens contract storage.
-     *
-     * @param _opco Address of the OPCO that contains the citizen to be deleted.
-     * @param _adr Address the of the citizen to delete.
-     */
-    function _deleteOPCOCitizen(address _opco, address _adr) private {
-        uint256 _opcoIndex = opcoIndex[_opco];
+        // delete citizen from OPCO.citizens
+        address _opco = citizens[_adr].opco;
         uint256 _delIndex;
-        for (uint256 i = 0; i < opcos[_opcoIndex].citizens.length; i++) {
-            if (opcos[_opcoIndex].citizens[i] == _adr) {
+        for (uint256 i = 0; i < opcos[_opco].citizens.length; i++) {
+            if (opcos[_opco].citizens[i] == _adr) {
                 _delIndex = i;
                 break;
             }
         }
         // move all elements to the left, starting from the deletion index + 1
-        for (uint256 i = _delIndex; i < opcos[_opcoIndex].citizens.length - 1; i++) {
-            opcos[opcoIndex[_opco]].citizens[i] = opcos[_opcoIndex].citizens[i + 1];
+        for (uint256 i = _delIndex; i < opcos[_opco].citizens.length - 1; i++) {
+            opcos[_opco].citizens[i] = opcos[_opco].citizens[i + 1];
         }
-        opcos[opcoIndex[_opco]].citizens.pop();
+        opcos[_opco].citizens.pop();
+        // "delete" citizen from citizens map
+        delete citizens[_adr];
     }
 
     /**
