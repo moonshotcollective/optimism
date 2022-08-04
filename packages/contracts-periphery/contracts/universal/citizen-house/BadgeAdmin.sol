@@ -578,13 +578,14 @@ contract BadgeAdmin is Ownable {
     }
 
     /**
-     * @notice (Internal) Delate a Citizen.
-     *         Note: This completely removes the citizen from the Citizen contract storage.
+     * @notice (Internal) Delete a Citizen.
+     *         Note: This overwrites the citizen from the citizens contract storage to its
+     *         default state and deletes the entry from the OPCO citizens array storage.
      *
      * @param _adr Address of the citizen to delete.
      */
     function _deleteCitizen(address _adr) private {
-        // delete citizen from OPCO.citizens
+        // delete citizen element from opco.citizens
         address _opco = citizens[_adr].opco;
         uint256 _delIndex;
         for (uint256 i = 0; i < opcos[_opco].citizens.length; i++) {
@@ -598,7 +599,7 @@ contract BadgeAdmin is Ownable {
             opcos[_opco].citizens[i] = opcos[_opco].citizens[i + 1];
         }
         opcos[_opco].citizens.pop();
-        // "delete" citizen from citizens map
+        // zero out citizen from citizens map
         delete citizens[_adr];
     }
 

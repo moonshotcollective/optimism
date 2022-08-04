@@ -669,6 +669,10 @@ contract BadgeAdminTest is Test {
             assertEq(badgeAdmin.getOPCOs(opcoAdrs)[i].co, opcoAdrs[i]);
             assertEq(badgeAdmin.getOPCOs(opcoAdrs)[i].minted, 0);
             assertEq(badgeAdmin.getOPCOs(opcoAdrs)[i].supply, getSupplySet(0)[i]);
+            // Test each citizen in the opco.citizens array
+            for (uint256 j = 0; j < badgeAdmin.getOPCOs(opcoAdrs)[i].citizens.length; j++) {
+                assertEq(badgeAdmin.getOPCOs(opcoAdrs)[i].citizens[j], getCitizenSet(0)[j]);
+            }
             assertTrue(badgeAdmin.getOPCOs(opcoAdrs)[i].valid);
         }
     }
