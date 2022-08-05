@@ -91,9 +91,10 @@ contract BadgeAdmin is Ownable {
     /**
      * @notice Emitted when OP role(s) are assigned.
      *
-     * @param _op Address of the OP caller.
+     * @param _sender Address of the OP sender.
+     * @param _op Address of the new OP.
      */
-    event OPAdded(address indexed _op);
+    event OPAdded(address indexed _sender, address indexed _op);
 
     /**
      * @notice Emitted when OP Company role(s) are assigned.
@@ -174,6 +175,13 @@ contract BadgeAdmin is Ownable {
      * @param _adr Address of the caller that updated its metadata.
      */
     event MetadataChanged(string _role, address indexed _adr);
+
+    /**
+     * @notice Emitted when a citizen has voted.
+     *
+     * @param _citizen Address of the citizen who submitted the ballot.
+     */
+    event Voted(address indexed _citizen);
 
     /**
      * @notice Modifier that prevents callers other than an OP from calling the function.
@@ -411,6 +419,7 @@ contract BadgeAdmin is Ownable {
         require(citizens[msg.sender].delegate == address(0), "Delegated to another citizen");
         require(citizens[msg.sender].minted, "Citizen has not minted");
         citizens[msg.sender].ballot = _ballot;
+        emit Voted(msg.sender);
     }
 
     /**
@@ -530,6 +539,7 @@ contract BadgeAdmin is Ownable {
         require(!isOP(_adr), "Address already OP");
         OP memory op = OP({ op: _adr, metadata: "" });
         ops[_adr] = op;
+        emit OPAdded(msg.sender, _adr);
     }
 
     /**
