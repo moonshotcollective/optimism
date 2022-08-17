@@ -2,7 +2,6 @@ package derive
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"time"
 
@@ -10,6 +9,17 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum/go-ethereum/log"
 )
+
+// The attributes queue sits in between the batch queue and the engine queue
+// It transforms batches into payload attributes. The outputted payload
+// attributes cannot be buffered because each batch->attributes transformation
+// pulls in data about the current L2 safe head.
+//
+// It also buffers batches that have been output because multiple batches can
+// be created at once.
+//
+// This stage can be reset by clearing it's batch buffer.
+// This stage does not need to retain any references to L1 blocks.
 
 type AttributesQueueOutput interface {
 	AddSafeAttributes(attributes *eth.PayloadAttributes)
@@ -55,14 +65,9 @@ func (aq *AttributesQueue) Step(ctx context.Context, outer Progress) error {
 
 	fetchCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	attrs, crit, err := PreparePayloadAttributes(fetchCtx, aq.config, aq.dl, aq.next.SafeL2Head(), batch.Timestamp, batch.Epoch())
+	attrs, err := PreparePayloadAttributes(fetchCtx, aq.config, aq.dl, aq.next.SafeL2Head(), batch.Timestamp, batch.Epoch())
 	if err != nil {
-		if crit {
-			return fmt.Errorf("failed to prepare payload attributes for batch: %v", err)
-		} else {
-			aq.log.Error("temporarily failing to prepare payload attributes for batch", "err", err)
-			return nil
-		}
+		return err
 	}
 
 	// we are verifying, not sequencing, we've got all transactions and do not pull from the tx-pool

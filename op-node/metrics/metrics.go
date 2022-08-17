@@ -37,12 +37,20 @@ type Metrics struct {
 	RPCClientRequestDurationSeconds *prometheus.HistogramVec
 	RPCClientResponsesTotal         *prometheus.CounterVec
 
+	L1SourceCache *CacheMetrics
+	// TODO: L2SourceCache *CacheMetrics
+
 	DerivationIdle        prometheus.Gauge
 	PipelineResetsTotal   prometheus.Counter
 	LastPipelineResetUnix prometheus.Gauge
 	UnsafePayloadsTotal   prometheus.Counter
 	DerivationErrorsTotal prometheus.Counter
+	SequencingErrorsTotal prometheus.Counter
+	PublishingErrorsTotal prometheus.Counter
 	Heads                 *prometheus.GaugeVec
+	L1ReorgDepth          prometheus.Histogram
+
+	TransactionsSequencedTotal prometheus.Counter
 
 	registry *prometheus.Registry
 }
@@ -114,6 +122,8 @@ func NewMetrics(procName string) *Metrics {
 			"error",
 		}),
 
+		L1SourceCache: NewCacheMetrics(registry, ns, "l1_source_cache", "L1 Source cache"),
+
 		DerivationIdle: promauto.With(registry).NewGauge(prometheus.GaugeOpts{
 			Namespace: ns,
 			Name:      "derivation_idle",
@@ -139,12 +149,34 @@ func NewMetrics(procName string) *Metrics {
 			Name:      "derivation_errors_total",
 			Help:      "Count of total derivation errors",
 		}),
+		SequencingErrorsTotal: promauto.With(registry).NewCounter(prometheus.CounterOpts{
+			Namespace: ns,
+			Name:      "sequencing_errors_total",
+			Help:      "Count of total sequencing errors",
+		}),
+		PublishingErrorsTotal: promauto.With(registry).NewCounter(prometheus.CounterOpts{
+			Namespace: ns,
+			Name:      "publishing_errors_total",
+			Help:      "Count of total p2p publishing errors",
+		}),
 		Heads: promauto.With(registry).NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: ns,
 			Name:      "heads",
 			Help:      "Gauge representing the different L1/L2 heads",
 		}, []string{
 			"type",
+		}),
+		L1ReorgDepth: promauto.With(registry).NewHistogram(prometheus.HistogramOpts{
+			Namespace: ns,
+			Name:      "l1_reorg_depth",
+			Buckets:   []float64{0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5, 10.5, 20.5, 50.5, 100.5},
+			Help:      "Histogram of L1 Reorg Depths",
+		}),
+
+		TransactionsSequencedTotal: promauto.With(registry).NewGauge(prometheus.GaugeOpts{
+			Namespace: ns,
+			Name:      "transactions_sequenced_total",
+			Help:      "Count of total transactions sequenced",
 		}),
 
 		registry: registry,
@@ -224,8 +256,11 @@ func (m *Metrics) SetHead(kind string, num uint64) {
 
 func (m *Metrics) RecordPipelineReset() {
 	m.PipelineResetsTotal.Inc()
-	m.DerivationErrorsTotal.Inc()
 	m.LastPipelineResetUnix.Set(float64(time.Now().Unix()))
+}
+
+func (m *Metrics) RecordL1ReorgDepth(d uint64) {
+	m.L1ReorgDepth.Observe(float64(d))
 }
 
 // Serve starts the metrics server on the given hostname and port.

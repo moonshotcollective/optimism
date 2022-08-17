@@ -5,11 +5,27 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"time"
 
 	"github.com/ethereum-optimism/optimism/op-node/eth"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum/go-ethereum/log"
 )
+
+// The batch queue is responsible for ordering unordered batches & generating empty batches
+// when the sequence window has passed. This is a very stateful stage.
+//
+// It receives batches that are tagged with the L1 Inclusion block of the batch. It only considers
+// batches that are inside the sequencing window of a specific L1 Origin.
+// It tries to eagerly pull batches based on the current L2 safe head.
+// Otherwise it filters/creates an entire epoch's worth of batches at once.
+//
+// This stage tracks a range of L1 blocks with the assumption that all batches with an L1 inclusion
+// block inside that range have been added to the stage by the time that it attempts to advance a
+// full epoch.
+//
+// It is internally responsible for making sure that batches with L1 inclusions block outside it's
+// working range are not considered or pruned.
 
 type BatchQueueOutput interface {
 	StageProgress
@@ -72,13 +88,12 @@ func (bq *BatchQueue) Step(ctx context.Context, outer Progress) error {
 		bq.log.Trace("Out of batches")
 		return io.EOF
 	} else if err != nil {
-		bq.log.Error("Error deriving batches", "err", err)
-		// Suppress transient errors for when reporting back to the pipeline
-		return nil
+		return err
 	}
 
 	for _, batch := range batches {
 		if uint64(batch.Timestamp) <= bq.next.SafeL2Head().Time {
+			bq.log.Debug("Dropping batch", "SafeL2Head", bq.next.SafeL2Head(), "SafeL2Head_Time", bq.next.SafeL2Head().Time, "batch_timestamp", batch.Timestamp)
 			// drop attributes if we are still progressing towards the next stage
 			// (after a reset rolled us back a full sequence window)
 			continue
@@ -100,14 +115,14 @@ func (bq *BatchQueue) ResetStep(ctx context.Context, l1Fetcher L1Fetcher) error 
 	return io.EOF
 }
 
-func (bq *BatchQueue) AddBatch(batch *BatchData) error {
+func (bq *BatchQueue) AddBatch(batch *BatchData) {
 	if bq.progress.Closed {
 		panic("write batch while closed")
 	}
-	bq.log.Trace("queued batch", "origin", bq.progress.Origin, "tx_count", len(batch.Transactions), "timestamp", batch.Timestamp)
 	if len(bq.l1Blocks) == 0 {
-		return fmt.Errorf("cannot add batch with timestamp %d, no origin was prepared", batch.Timestamp)
+		panic(fmt.Errorf("cannot add batch with timestamp %d, no origin was prepared", batch.Timestamp))
 	}
+	bq.log.Trace("queuing batch", "origin", bq.progress.Origin, "tx_count", len(batch.Transactions), "timestamp", batch.Timestamp)
 
 	data := BatchWithL1InclusionBlock{
 		L1InclusionBlock: bq.progress.Origin,
@@ -119,39 +134,45 @@ func (bq *BatchQueue) AddBatch(batch *BatchData) error {
 		for _, b := range batches {
 			if b.Batch.Timestamp == batch.Timestamp && b.Batch.Epoch() == batch.Epoch() {
 				bq.log.Warn("duplicate batch", "epoch", batch.Epoch(), "timestamp", batch.Timestamp, "txs", len(batch.Transactions))
-				return nil
+				return
 			}
 		}
 	} else {
 		bq.log.Debug("First seen batch", "epoch", batch.Epoch(), "timestamp", batch.Timestamp, "txs", len(batch.Transactions))
-
 	}
 	// May have duplicate block numbers or individual fields, but have limited complete duplicates
 	bq.batchesByTimestamp[batch.Timestamp] = append(batches, &data)
-	return nil
 }
 
 // validExtension determines if a batch follows the previous attributes
-func (bq *BatchQueue) validExtension(batch *BatchWithL1InclusionBlock, prevTime, prevEpoch uint64) bool {
+func (bq *BatchQueue) validExtension(batch *BatchWithL1InclusionBlock, prevTime, prevEpoch uint64) (valid bool, err error) {
 	if batch.Batch.Timestamp != prevTime+bq.config.BlockTime {
 		bq.log.Debug("Batch does not extend the block time properly", "time", batch.Batch.Timestamp, "prev_time", prevTime)
-
-		return false
+		return false, nil
 	}
 	if batch.Batch.EpochNum != rollup.Epoch(prevEpoch) && batch.Batch.EpochNum != rollup.Epoch(prevEpoch+1) {
 		bq.log.Debug("Batch does not extend the epoch properly", "epoch", batch.Batch.EpochNum, "prev_epoch", prevEpoch)
-
-		return false
+		return false, nil
 	}
-	// TODO: Also check EpochHash (hard b/c maybe extension)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	l1BlockRef, err := bq.dl.L1BlockRefByNumber(ctx, batch.Batch.Epoch().Number)
+	cancel()
+	if err != nil {
+		return false, err
+	}
+
+	if l1BlockRef.Hash != batch.Batch.EpochHash {
+		bq.log.Debug("Batch epoch hash does not match expected L1 block hash", "batch_epoch", batch.Batch.Epoch(), "expected", l1BlockRef.ID())
+		return false, nil
+	}
 
 	// Note: `Batch.EpochNum` is an external input, but it is constrained to be a reasonable size by the
 	// above equality checks.
 	if uint64(batch.Batch.EpochNum)+bq.config.SeqWindowSize < batch.L1InclusionBlock.Number {
 		bq.log.Debug("Batch submitted outside sequence window", "epoch", batch.Batch.EpochNum, "inclusion_block", batch.L1InclusionBlock.Number)
-		return false
+		return false, nil
 	}
-	return true
+	return true, nil
 }
 
 // deriveBatches pulls a single batch eagerly or a collection of batches if it is the end of
@@ -201,7 +222,7 @@ func (bq *BatchQueue) deriveBatches(ctx context.Context, l2SafeHead eth.L2BlockR
 		bq.log.Trace("found batches", "len", len(batches))
 		// Filter + Fill batches
 		batches = FilterBatches(bq.log, bq.config, epoch.ID(), minL2Time, maxL2Time, batches)
-		bq.log.Trace("filtered batches", "len", len(batches), "l1Origin", bq.l1Blocks[0], "nextL1Block", bq.l1Blocks[1])
+		bq.log.Trace("filtered batches", "len", len(batches), "l1Origin", bq.l1Blocks[0], "nextL1Block", bq.l1Blocks[1], "minL2Time", minL2Time, "maxL2Time", maxL2Time)
 		batches = FillMissingBatches(batches, epoch.ID(), bq.config.BlockTime, minL2Time, nextL1BlockTime)
 		bq.log.Trace("added missing batches", "len", len(batches), "l1OriginTime", l1OriginTime, "nextL1BlockTime", nextL1BlockTime)
 		// Advance an epoch after filling all batches.
@@ -211,15 +232,14 @@ func (bq *BatchQueue) deriveBatches(ctx context.Context, l2SafeHead eth.L2BlockR
 
 	} else {
 		bq.log.Trace("Trying to eagerly find batch")
-		var ret []*BatchData
 		next, err := bq.tryPopNextBatch(ctx, l2SafeHead)
-		if next != nil {
+		if err != nil {
+			return nil, err
+		} else {
 			bq.log.Info("found eager batch", "batch", next.Batch)
-			ret = append(ret, next.Batch)
+			return []*BatchData{next.Batch}, nil
 		}
-		return ret, err
 	}
-
 }
 
 // tryPopNextBatch tries to get the next batch from the batch queue using an eager approach.
@@ -266,8 +286,7 @@ func (bq *BatchQueue) tryPopNextBatch(ctx context.Context, l2SafeHead eth.L2Bloc
 		// Note: Don't check epoch change here, check it in `validExtension`
 		epoch, err := bq.dl.L1BlockRefByNumber(ctx, uint64(batch.Batch.EpochNum))
 		if err != nil {
-			bq.log.Warn("error fetching origin", "err", err)
-			return nil, err
+			return nil, NewTemporaryError(fmt.Errorf("error fetching origin: %w", err))
 		}
 		if err := ValidBatch(batch.Batch, bq.config, epoch.ID(), minL2Time, maxL2Time); err != nil {
 			bq.log.Warn("Invalid batch", "err", err)
@@ -275,7 +294,9 @@ func (bq *BatchQueue) tryPopNextBatch(ctx context.Context, l2SafeHead eth.L2Bloc
 		}
 
 		// We have a valid batch, no make sure that it builds off the previous L2 block
-		if bq.validExtension(batch, l2SafeHead.Time, l2SafeHead.L1Origin.Number) {
+		if valid, err := bq.validExtension(batch, l2SafeHead.Time, l2SafeHead.L1Origin.Number); err != nil {
+			return nil, err
+		} else if valid {
 			// Advance the epoch if needed
 			if l2SafeHead.L1Origin.Number != uint64(batch.Batch.EpochNum) {
 				bq.l1Blocks = bq.l1Blocks[1:]
@@ -283,12 +304,12 @@ func (bq *BatchQueue) tryPopNextBatch(ctx context.Context, l2SafeHead eth.L2Bloc
 			// Don't leak data in the map
 			delete(bq.batchesByTimestamp, batch.Batch.Timestamp)
 
-			bq.log.Info("Batch was valid extension")
+			bq.log.Debug("Batch was valid extension")
 
 			// We have found the fist valid batch.
 			return batch, nil
 		} else {
-			bq.log.Info("batch was not valid extension")
+			bq.log.Warn("batch was not valid extension", "inclusion", batch.L1InclusionBlock, "safe_origin", l2SafeHead.L1Origin, "l2_time", l2SafeHead.Time)
 		}
 	}
 

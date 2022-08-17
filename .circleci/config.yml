@@ -245,6 +245,11 @@ jobs:
             golangci-lint run -E goimports,sqlclosecheck,bodyclose,asciicheck,misspell ./...
           working_directory: op-e2e
       - run:
+          name: lint op-service
+          command: |
+            golangci-lint run -E goimports,sqlclosecheck,bodyclose,asciicheck,misspell ./...
+          working_directory: op-service
+      - run:
           name: prep results dir
           command: mkdir -p /test-results
       - run:
@@ -267,6 +272,11 @@ jobs:
           command: |
             gotestsum --junitfile /test-results/op-e2e.xml -- -coverpkg=github.com/ethereum-optimism/optimism/... -coverprofile=coverage.out -covermode=atomic ./...
           working_directory: op-e2e
+      - run:
+          name: test op-service
+          command: |
+            gotestsum --junitfile /test-results/op-service.xml -- -coverpkg=github.com/ethereum-optimism/optimism/... -coverprofile=coverage.out -covermode=atomic ./...
+          working_directory: op-service
       - store_test_results:
           path: /test-results
       - run:
@@ -278,13 +288,18 @@ jobs:
     steps:
       - checkout
       - run:
+          name: yarn dev deps  # todo: what's the best way to pull in the dependencies for linting? yarn install above is using production env without dev dependencies
+          command: yarn install --production=false
+      - run:
+          name: specs toc
+          command: yarn lint:specs:toc && git diff --exit-code ./specs
+      - run:
           name: markdown lint
-          command: |
-            docker run -v `pwd`:/workdir davidanson/markdownlint-cli2:0.4.0 "op-node/README.md" "./specs/**/*.md" "#**/node_modules"
+          command: yarn lint:specs:check
       - run:
           name: link lint
           command: |
-            docker run --init -it -v `pwd`:/input lycheeverse/lychee --verbose --no-progress --exclude-loopback --exclude twitter.com --exclude-mail /input/README.md "/input/specs/**/*.md" "/input/meta/**/*.md" "/input/op-node/**/*.md" || exit 0
+            docker run --init -it -v `pwd`:/input lycheeverse/lychee --verbose --no-progress --exclude-loopback --exclude twitter.com --exclude-mail /input/README.md "/input/specs/**/*.md"
 
   fuzz-op-node:
     docker:
@@ -398,6 +413,24 @@ jobs:
                 command: make <<parameters.binary_name>>
                 working_directory: <<parameters.working_directory>>
 
+  state-surgery-tests:
+    docker:
+      - image: ethereumoptimism/ci-builder:latest
+    steps:
+      - checkout
+      - run:
+          name: Check if we should run
+          command: |
+            CHANGED=$(bash ./ops/docker/ci-builder/check-changed.sh "state-surgery")
+            if [[ "$CHANGED" = "FALSE" ]]; then
+              circleci step halt
+            fi
+      - run:
+          name: Test
+          command: |
+            gotestsum --junitfile /test-results/state-surgery.xml -- -coverpkg=github.com/ethereum-optimism/optimism/... -coverprofile=coverage.out -covermode=atomic ./...
+          working_directory: state-surgery
+
   geth-tests:
     docker:
       - image: ethereumoptimism/ci-builder:latest
@@ -427,7 +460,7 @@ jobs:
       - run:
           name: Check if we should run
           command: |
-            CHANGED=$(bash ./ops/docker/ci-builder/check-changed.sh "(contracts-bedrock|op-bindings|op-batcher|op-node|op-proposer|ops-bedrock)/")
+            CHANGED=$(bash ./ops/docker/ci-builder/check-changed.sh "(contracts-bedrock|op-bindings|op-batcher|op-node|op-proposer|ops-bedrock|sdk)/")
             if [[ "$CHANGED" = "FALSE" ]]; then
               circleci step halt
             fi
@@ -449,9 +482,8 @@ jobs:
             make devnet-up
       - run:
           name: Do a deposit
-          no_output_timeout: 5m
           command: |
-            npx hardhat deposit \
+            timeout 5m npx hardhat deposit \
                 --to 0xB79f76EF2c5F0286176833E7B2eEe103b1CC3244  \
                 --amount-eth 1 \
                 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
@@ -459,7 +491,11 @@ jobs:
           working_directory: packages/contracts-bedrock
       - run:
           name: Deposit ERC20 through the bridge
-          command: npx hardhat deposit --network devnetL1
+          command: timeout 5m npx hardhat deposit-erc20 --network devnetL1
+          working_directory: packages/sdk
+      - run:
+          name: Deposit ETH through the bridge
+          command: timeout 5m npx hardhat deposit-eth --network devnetL1
           working_directory: packages/sdk
       - run:
           name: Check the status
@@ -582,6 +618,12 @@ workflows:
           requires:
             - yarn-monorepo
       - js-lint-test:
+          name: actor-tests-tests
+          package_name: actor-tests
+          dependencies: "(core-utils|sdk)"
+          requires:
+            - yarn-monorepo
+      - js-lint-test:
           name: contracts-governance-tests
           package_name: contracts-governance
           dependencies: "(core-utils|sdk)"
@@ -668,6 +710,7 @@ workflows:
       - integration-tests
       - semgrep-scan
       - go-mod-tidy
+      - state-surgery-tests
 
   nightly:
     triggers:

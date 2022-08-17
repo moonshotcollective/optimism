@@ -3,14 +3,17 @@ package driver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	gosync "sync"
 	"time"
 
+	"github.com/ethereum-optimism/optimism/op-node/backoff"
 	"github.com/ethereum-optimism/optimism/op-node/eth"
 	"github.com/ethereum-optimism/optimism/op-node/metrics"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -152,6 +155,9 @@ func (s *state) handleNewL1Block(newL1Head eth.L1BlockRef) {
 		// dealing with a linear extension (new block is the immediate child of the old one).
 		s.log.Debug("L1 head moved forward", "l1Head", newL1Head)
 	} else {
+		if s.l1Head.Number >= newL1Head.Number {
+			s.metrics.RecordL1ReorgDepth(s.l1Head.Number - newL1Head.Number)
+		}
 		// New L1 block is not the same as the current head or a single step linear extension.
 		// This could either be a long L1 extension, or a reorg. Both can be handled the same way.
 		s.log.Warn("L1 Head signal indicates an L1 re-org", "old_l1_head", s.l1Head, "new_l1_head_parent", newL1Head.ParentHash, "new_l1_head", newL1Head)
@@ -244,11 +250,13 @@ func (s *state) createNewL2Block(ctx context.Context) error {
 	s.l2Head = newUnsafeL2Head
 
 	s.log.Info("Sequenced new l2 block", "l2Head", s.l2Head, "l1Origin", s.l2Head.L1Origin, "txs", len(payload.Transactions), "time", s.l2Head.Time)
+	s.metrics.TransactionsSequencedTotal.Add(float64(len(payload.Transactions)))
 
 	if s.network != nil {
 		if err := s.network.PublishL2Payload(ctx, payload); err != nil {
 			s.log.Warn("failed to publish newly created block", "id", payload.ID(), "err", err)
-			return err
+			s.metrics.PublishingErrorsTotal.Inc()
+			// publishing of unsafe data via p2p is optional. Errors are not severe enough to change/halt sequencing but should be logged and metered.
 		}
 	}
 
@@ -289,12 +297,35 @@ func (s *state) eventLoop() {
 		}
 	}
 
-	// reqStep requests a derivation step to be taken. Won't deadlock if the channel is full.
-	reqStep := func() {
+	// channel, nil by default (not firing), but used to schedule re-attempts with delay
+	var delayedStepReq <-chan time.Time
+
+	// keep track of consecutive failed attempts, to adjust the backoff time accordingly
+	bOffStrategy := backoff.Exponential()
+	stepAttempts := 0
+
+	// step requests a derivation step to be taken. Won't deadlock if the channel is full.
+	step := func() {
 		select {
 		case stepReqCh <- struct{}{}:
 		// Don't deadlock if the channel is already full
 		default:
+		}
+	}
+
+	// reqStep requests a derivation step nicely, with a delay if this is a reattempt, or not at all if we already scheduled a reattempt.
+	reqStep := func() {
+		if stepAttempts > 0 {
+			// if this is not the first attempt, we re-schedule with a backoff, *without blocking other events*
+			if delayedStepReq == nil {
+				delay := bOffStrategy.Duration(stepAttempts)
+				s.log.Debug("scheduling re-attempt with delay", "attempts", stepAttempts, "delay", delay)
+				delayedStepReq = time.After(delay)
+			} else {
+				s.log.Debug("ignoring step request, already scheduled re-attempt after previous failure", "attempts", stepAttempts)
+			}
+		} else {
+			step()
 		}
 	}
 
@@ -321,7 +352,8 @@ func (s *state) eventLoop() {
 			cancel()
 			if err != nil {
 				s.log.Error("Error creating new L2 block", "err", err)
-				s.metrics.DerivationErrorsTotal.Inc()
+				s.metrics.SequencingErrorsTotal.Inc()
+				break // if we fail, we wait for the next block creation trigger.
 			}
 
 			// We need to catch up to the next origin as quickly as possible. We can do this by
@@ -345,24 +377,42 @@ func (s *state) eventLoop() {
 			s.snapshot("New L1 Head")
 			s.handleNewL1Block(newL1Head)
 			reqStep() // a new L1 head may mean we have the data to not get an EOF again.
+		case <-delayedStepReq:
+			delayedStepReq = nil
+			step()
 		case <-stepReqCh:
 			s.metrics.SetDerivationIdle(false)
 			s.idleDerivation = false
-			s.log.Debug("Derivation process step", "onto_origin", s.derivation.Progress().Origin, "onto_closed", s.derivation.Progress().Closed)
+			s.log.Debug("Derivation process step", "onto_origin", s.derivation.Progress().Origin, "onto_closed", s.derivation.Progress().Closed, "attempts", stepAttempts)
 			stepCtx, cancel := context.WithTimeout(ctx, time.Second*10) // TODO pick a timeout for executing a single step
 			err := s.derivation.Step(stepCtx)
 			cancel()
+			stepAttempts += 1 // count as attempt by default. We reset to 0 if we are making healthy progress.
 			if err == io.EOF {
 				s.log.Debug("Derivation process went idle", "progress", s.derivation.Progress().Origin)
 				s.idleDerivation = true
+				stepAttempts = 0
 				s.metrics.SetDerivationIdle(true)
 				continue
-			} else if err != nil {
+			} else if err != nil && errors.Is(err, derive.ErrReset) {
 				// If the pipeline corrupts, e.g. due to a reorg, simply reset it
 				s.log.Warn("Derivation pipeline is reset", "err", err)
 				s.derivation.Reset()
 				s.metrics.RecordPipelineReset()
+				continue
+			} else if err != nil && errors.Is(err, derive.ErrTemporary) {
+				s.log.Warn("Derivation process temporary error", "attempts", stepAttempts, "err", err)
+				reqStep()
+				continue
+			} else if err != nil && errors.Is(err, derive.ErrCritical) {
+				s.log.Error("Derivation process critical error", "err", err)
+				return
+			} else if err != nil {
+				s.log.Error("Derivation process error", "attempts", stepAttempts, "err", err)
+				reqStep()
+				continue
 			} else {
+				stepAttempts = 0
 				finalized, safe, unsafe := s.derivation.Finalized(), s.derivation.SafeL2Head(), s.derivation.UnsafeL2Head()
 				// log sync progress when it changes
 				if s.l2Finalized != finalized || s.l2SafeHead != safe || s.l2Head != unsafe {

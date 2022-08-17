@@ -5,10 +5,15 @@ import {
   TransactionReceipt,
   TransactionResponse,
   TransactionRequest,
-  Log,
 } from '@ethersproject/abstract-provider'
 import { Signer } from '@ethersproject/abstract-signer'
-import { ethers, BigNumber, Overrides, CallOverrides } from 'ethers'
+import {
+  ethers,
+  BigNumber,
+  Overrides,
+  CallOverrides,
+  PayableOverrides,
+} from 'ethers'
 import {
   sleep,
   remove0x,
@@ -244,13 +249,15 @@ export class CrossChainMessenger implements ICrossChainMessenger {
         // Try to pull out the value field, but only if the very next log is a SentMessageExtraData
         // event which was introduced in the Bedrock upgrade.
         let value = ethers.BigNumber.from(0)
-        if (receipt.logs.length > log.logIndex + 1) {
-          const next = receipt.logs[log.logIndex + 1]
-          if (next.address === messenger.address) {
-            const nextParsed = messenger.interface.parseLog(next)
-            if (nextParsed.name === 'SentMessageExtension1') {
-              value = nextParsed.args.value
-            }
+        const next = receipt.logs.find((l) => {
+          return (
+            l.logIndex === log.logIndex + 1 && l.address === messenger.address
+          )
+        })
+        if (next) {
+          const nextParsed = messenger.interface.parseLog(next)
+          if (nextParsed.name === 'SentMessageExtension1') {
+            value = nextParsed.args.value
           }
         }
 
@@ -1091,7 +1098,6 @@ export class CrossChainMessenger implements ICrossChainMessenger {
           latestBlockhash: block.hash,
         },
         withdrawalProof: ethers.utils.RLP.encode(stateTrieProof.storageProof),
-        // withdrawalProof: toHexString(rlp.encode(stateTrieProof.storageProof)),
       },
       output,
       // TODO(tynes): use better type, typechain?
@@ -1143,7 +1149,7 @@ export class CrossChainMessenger implements ICrossChainMessenger {
     message: MessageLike,
     opts?: {
       signer?: Signer
-      overrides?: Overrides
+      overrides?: PayableOverrides
     }
   ): Promise<TransactionResponse> {
     return (opts?.signer || this.l1Signer).sendTransaction(
@@ -1315,7 +1321,7 @@ export class CrossChainMessenger implements ICrossChainMessenger {
     finalizeMessage: async (
       message: MessageLike,
       opts?: {
-        overrides?: Overrides
+        overrides?: PayableOverrides
       }
     ): Promise<TransactionRequest> => {
       const resolved = await this.toCrossChainMessage(message)
@@ -1344,7 +1350,8 @@ export class CrossChainMessenger implements ICrossChainMessenger {
             proof.outputRootProof.withdrawerStorageRoot,
             proof.outputRootProof.latestBlockhash,
           ],
-          proof.withdrawalProof
+          proof.withdrawalProof,
+          opts?.overrides || {}
         )
       } else {
         // L1CrossDomainMessenger relayMessage is the only method that isn't fully backwards
@@ -1372,7 +1379,7 @@ export class CrossChainMessenger implements ICrossChainMessenger {
       opts?: {
         recipient?: AddressLike
         l2GasLimit?: NumberLike
-        overrides?: Overrides
+        overrides?: PayableOverrides
       }
     ): Promise<TransactionRequest> => {
       return this.bridges.ETH.populateTransaction.deposit(
