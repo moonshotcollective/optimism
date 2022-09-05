@@ -7,7 +7,6 @@ import { IERC165 } from "openzeppelin-contracts/contracts/utils/introspection/IE
 import { Ownable } from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol";
 import { SocialContract } from "./SocialContract.sol";
-import { MintManager } from "./MintManager.sol";
 
 error Soulbound();
 
@@ -21,18 +20,15 @@ contract Optimist is ERC721, Ownable {
     string public baseURI;
     address public optimistNftAdmin;
     address public socialContract;
-    address public mintManagerContract;
 
     constructor(
         string memory _name,
         string memory _symbol,
         address memory _optimistNftAdmin,
-        address memory _socialContract,
-        address memory _mintManager
+        address memory _socialContract
     ) payable ERC721(_name, _symbol) {
         optimistNftAdmin = _optimistNftAdmin;
         socialContract = _socialContract;
-        mintManager = _mintManager;
     }
 
     function updateBaseURI() public onlyOwner {
@@ -46,28 +42,19 @@ contract Optimist is ERC721, Ownable {
     {
         optimistNftAdmin = _optimistNftAdmin;
         socialContract = _socialContract;
-        bytes32 _mintManager = keccak256("opnft.mintManagerAddress");
-        mintManager = SocialContract(socialContract).attestations[optimistNftAdmin][address(this)][
-            _mintManager
-        ];
     }
 
     function mint() external payable {
         require(balanceOf(msg.sender) == 0, "Optimist: AlreadyClaimed");
-        require(
-            MintManager(mintManager).canAddressMint(msg.sender) == true,
-            "Optimist: InvalidMinter"
-        );
-        unchecked {
-            _mint(msg.sender, totalSupply++);
-        }
+        uint256 mintID = uint256(uint160(msg.sender));
+        _mint(msg.sender, mintID);
+        totalSupply++;
     }
 
-    function burn(uint256 _id) external {
-        require(balanceOf(msg.sender) == 1 || ownerOf(_id) == msg.sender, "Optimist: InvalidBurn");
-        unchecked {
-            _burn(_id);
-        }
+    function burn() external {
+        uint256 mintID = uint256(uint160(msg.sender));
+        require(balanceOf(msg.sender) == 1, "Optimist: InvalidBurn");
+        _burn(mintID);
     }
 
     function withdraw() external onlyOwner {
