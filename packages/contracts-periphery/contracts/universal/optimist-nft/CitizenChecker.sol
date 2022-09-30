@@ -3,15 +3,26 @@ pragma solidity 0.8.15;
 import "./ICitizenChecker.sol";
 import "./SocialContract.sol";
 
-contract CitizenshipChecker is ICitizenshipChecker {
+contract CitizenChecker is ICitizenChecker {
+    struct CitizenProof {
+        address opco;
+        uint256 index;
+    }
+
     address public root;
     SocialContract public sc;
 
     function isCitizen(address _who, bytes memory _proof) external view returns (bool) {
-        // Good enough for now
-        address opco = toAddress(_proof);
-        require(toBool(sc.attestations(sc, opco, keccak256("op.opco"))) == true);
-        require(toBool(sc.attestations(opco, _who, keccak256("op.opco.citizen"))) == true);
+        CitizenProof memory proof = abi.decode(_proof, (CitizenProof));
+        bytes memory numOpcoCitizenships = sc.attestations(root, proof.opco, keccak256("op.opco"));
+        require(proof.index < uint256(bytes32(numOpcoCitizenships)));
+        // require(
+        //     sc.attestations(
+        //         proof.opco,
+        //         _who,
+        //         keccak256(abi.encodePacked("op.opco.citizen.", proof.index))
+        //     ) == true // TODO: fix this
+        // );
         return true;
     }
 }
