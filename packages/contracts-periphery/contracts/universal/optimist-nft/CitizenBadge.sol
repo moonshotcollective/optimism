@@ -17,7 +17,8 @@ contract CitizenBadge is ERC721 {
         uint256 _tokenId,
         bytes memory _proof
     ) public {
-        require(ICitizenshipChecker.isCitizen(_to, _proof));
+        // check if the user is a citizen
+        require(ICitizenChecker(admin).isCitizen(_to, _proof), "CitizenBadge: not a citizen");
         _mint(_to, _tokenId);
     }
 
@@ -29,10 +30,11 @@ contract CitizenBadge is ERC721 {
         revert("CitizenBagde: SOULBOUND");
     }
 
-    function _baseURI() internal pure override returns (bytes) {
-        return
-            SocialContract.attestations[admin][address(this)][
-                keccak256("opnft.citizenshipBadgeNftBaseURI")
-            ];
-    }
+    // TODO: fix this
+    // function _baseURI() internal pure override returns (bytes) {
+    //     return
+    //         SocialContract.attestations[admin][address(this)][
+    //             keccak256("opnft.citizenshipBadgeNftBaseURI")
+    //         ];
+    // }
 }
