@@ -8,6 +8,8 @@ import "./SocialContract.sol";
 contract CitizenBadge is ERC721 {
     address public admin;
 
+    SocialContract public sc;
+
     constructor(address _admin) ERC721("CitizenBadge", "CB") {
         admin = _admin;
     }
@@ -23,18 +25,22 @@ contract CitizenBadge is ERC721 {
     }
 
     function _transfer(
-        address from,
-        address to,
-        uint256 tokenId
-    ) internal override {
+        address,
+        address,
+        uint256
+    ) internal pure override {
         revert("CitizenBagde: SOULBOUND");
     }
 
-    // TODO: fix this
-    // function _baseURI() internal pure override returns (bytes) {
-    //     return
-    //         SocialContract.attestations[admin][address(this)][
-    //             keccak256("opnft.citizenshipBadgeNftBaseURI")
-    //         ];
-    // }
+    function _baseURI() internal view override returns (string memory) {
+        return
+            abi.decode(
+                sc.attestations(
+                    admin,
+                    address(this),
+                    keccak256("opnft.citizenshipBadgeNftBaseURI")
+                ),
+                (string)
+            );
+    }
 }
