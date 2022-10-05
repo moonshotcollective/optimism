@@ -20,8 +20,8 @@ contract CitizenBadge is ERC721 {
         bytes memory _proof
     ) public {
         // check if the user is a citizen
-        require(ICitizenChecker(admin).isCitizen(_to, _proof), "CitizenBadge: not a citizen");
-        _mint(_to, _tokenId);
+        require(ICitizenChecker(admin).isCitizen(_to, _proof), "CitizenBadge: NOT_CITIZEN");
+        _safeMint(_to, _tokenId);
     }
 
     function _transfer(
@@ -29,7 +29,7 @@ contract CitizenBadge is ERC721 {
         address,
         uint256
     ) internal pure override {
-        revert("CitizenBagde: SOULBOUND");
+        revert("CitizenBadge: SOULBOUND");
     }
 
     function _baseURI() internal view override returns (string memory) {
