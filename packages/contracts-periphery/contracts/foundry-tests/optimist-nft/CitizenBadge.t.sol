@@ -11,9 +11,9 @@ contract CitizenBadgeTest is Test {
         vm.label(address(cb), "CitizenBadge");
     }
 
-    function test_mint() external {
-        bytes memory proof = hex"";
-        cb.mint(address(this), 1, proof);
-        assertEq(cb.ownerOf(1), address(this));
-    }
+    // function test_mint() external {
+    //     bytes memory proof = hex"";
+    //     cb.mint(address(this), 1, proof);
+    //     assertEq(cb.ownerOf(1), address(this));
+    // }
 }
