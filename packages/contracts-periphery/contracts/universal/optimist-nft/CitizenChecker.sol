@@ -12,6 +12,11 @@ contract CitizenChecker is ICitizenChecker {
     address public root;
     SocialContract public sc;
 
+    constructor(address _root, address _sc) {
+        root = _root;
+        sc = SocialContract(_sc);
+    }
+
     function toBool(bytes memory _b) internal pure returns (bool) {
         return abi.decode(_b, (bool));
     }
